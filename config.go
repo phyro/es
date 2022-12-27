@@ -1,18 +1,15 @@
 package main
 
+import (
+	"github.com/mitchellh/go-homedir"
+)
+
 var config Config
 
 type Config struct {
-	DataDir    string            `json:"-"`
-	Relays     map[string]Policy `json:"relays,flow"`
-	Following  []Follow          `json:"following,flow"`
-	PrivateKey string            `json:"privatekey,omitempty"`
-}
-
-type Follow struct {
-	Key    string   `json:"key"`
-	Name   string   `json:"name,flow,omitempty"`
-	Relays []string `json:"relays,flow,omitempty"`
+	Active  string            `json:"active"`
+	DataDir string            `json:"-"`
+	Relays  map[string]Policy `json:"relays,flow"`
 }
 
 type Policy struct {
@@ -34,5 +31,9 @@ func (p Policy) String() string {
 func (c *Config) Init() {
 	if c.Relays == nil {
 		c.Relays = make(map[string]Policy)
+	}
+	if c.DataDir == "" {
+		base_dir_exp, _ := homedir.Expand(BASE_DIR)
+		c.DataDir = base_dir_exp
 	}
 }

@@ -6,12 +6,14 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-var pool *nostr.RelayPool
+type Nostr struct {
+	Relays map[string]Policy
+}
 
-func initNostr() {
-	pool = nostr.NewRelayPool()
+func (n *Nostr) Init() *nostr.RelayPool {
+	pool := nostr.NewRelayPool()
 
-	for relay, policy := range config.Relays {
+	for relay, policy := range n.Relays {
 		cherr := pool.Add(relay, nostr.SimplePolicy{
 			Read:  policy.Read,
 			Write: policy.Write,
@@ -37,7 +39,15 @@ func initNostr() {
 		}
 	}()
 
-	if config.PrivateKey != "" {
-		pool.SecretKey = &config.PrivateKey
-	}
+	return pool
+}
+
+func (n *Nostr) WritePool(priv_key string) *nostr.RelayPool {
+	pool := n.Init()
+	pool.SecretKey = &priv_key
+	return pool
+}
+
+func (n *Nostr) ReadPool() *nostr.RelayPool {
+	return n.Init()
 }

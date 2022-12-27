@@ -2,50 +2,15 @@ package main
 
 import (
 	"encoding/hex"
-	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/docopt/docopt-go"
 
 	"github.com/nbd-wtf/go-nostr/nip06"
-	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-func setPrivateKey(opts docopt.Opts) {
-	keyhex := opts["<key>"].(string)
-	keylen := len(keyhex)
-
-	if keylen < 64 {
-		log.Printf("key too short was %d characters, must be 32 bytes hex-encoded, i.e. 64 characters.\n", keylen)
-		return
-	}
-
-	if _, err := hex.DecodeString(keyhex); err != nil {
-		log.Printf("Error decoding key from hex: %s\n", err.Error())
-		return
-	}
-
-	config.PrivateKey = keyhex
-}
-
-func showPublicKey(opts docopt.Opts) {
-	if config.PrivateKey == "" {
-		log.Printf("No private key set.\n")
-		return
-	}
-
-	pubkey := getPubKey(config.PrivateKey)
-	if pubkey != "" {
-		fmt.Printf("%s\n", pubkey)
-
-		nip19pubkey, _ := nip19.EncodePublicKey(pubkey, "")
-		fmt.Printf("%s\n", nip19pubkey)
-	}
-}
-
 func getPubKey(privateKey string) string {
-	if keyb, err := hex.DecodeString(config.PrivateKey); err != nil {
+	if keyb, err := hex.DecodeString(privateKey); err != nil {
 		log.Printf("Error decoding key from hex: %s\n", err.Error())
 		return ""
 	} else {
@@ -54,11 +19,11 @@ func getPubKey(privateKey string) string {
 	}
 }
 
-func keyGen(opts docopt.Opts) {
+func keyGen() (string, string, error) {
 	seedWords, err := nip06.GenerateSeedWords()
 	if err != nil {
 		log.Println(err)
-		return
+		return "", "", err
 	}
 
 	seed := nip06.SeedFromWords(seedWords)
@@ -66,9 +31,8 @@ func keyGen(opts docopt.Opts) {
 	sk, err := nip06.PrivateKeyFromSeed(seed)
 	if err != nil {
 		log.Println(err)
-		return
+		return "", "", err
 	}
 
-	fmt.Println("seed:", seedWords)
-	fmt.Println("private key:", sk)
+	return seedWords, sk, nil
 }

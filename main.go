@@ -1,125 +1,145 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
 	"github.com/docopt/docopt-go"
-	"github.com/mitchellh/go-homedir"
+	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-const USAGE = `noscl
+const USAGE = `es
 
 Usage:
-  noscl home [--verbose]
-  noscl setprivate <key>
-  noscl sign <event-json>
-  noscl verify <event-json>
-  noscl public
-  noscl publish [--reference=<id>...] [--profile=<id>...] <content>
-  noscl message [--reference=<id>...] <pubkey> <content>
-  noscl metadata --name=<name> [--about=<about>] [--picture=<picture>]
-  noscl profile [--verbose] <pubkey>
-  noscl follow <pubkey> [--name=<name>]
-  noscl unfollow <pubkey>
-  noscl event view [--verbose] <id>
-  noscl event delete <id>
-  noscl share-contacts
-  noscl key-gen
-  noscl relay
-  noscl relay add <url>
-  noscl relay remove <url>
-  noscl relay recommend <url>
-
-Specify <content> as '-' to make the publish or message command read it
-from stdin.
+  es world
+  es create <name> <key>
+  es create <name> [--gen]
+  es remove <name>
+  es switch <name>
+  es ll [-a]
+  es append <content>
+  es follow <name> <pubkey>
+  es unfollow <name>
+  es sync <name>
+  es sync
+  es log [--name=<name>]
+  es show <id> [--verbose]
+  es relay
+  es relay add <url>
+  es relay remove <url>
 `
 
-func main() {
-	// find datadir
-	flag.StringVar(&config.DataDir, "datadir", "~/.config/nostr",
-		"Base directory for configurations and data from Nostr.")
-	flag.Parse()
-	config.DataDir, _ = homedir.Expand(config.DataDir)
-	os.Mkdir(config.DataDir, 0700)
+// Fails if we have no active event stream (required for appending etc.)
+func require_active(db *LocalDB) {
+	if db.config.Active == "" {
+		log.Panic("Please set an active stream with `es switch <name>`.")
+	}
+}
 
-	// logger config
+func main() {
+	flag.Parse()
 	log.SetPrefix("<> ")
 
-	// parse config
-	path := filepath.Join(config.DataDir, "config.json")
-	f, err := os.Open(path)
-	if err != nil {
-		saveConfig(path)
-		f, _ = os.Open(path)
-	}
-	f, _ = os.Open(path)
-	err = json.NewDecoder(f).Decode(&config)
-	if err != nil {
-		log.Fatal("can't parse config file " + path + ": " + err.Error())
-		return
-	}
-	config.Init()
+	db := LocalDB{}
+	db.Init()
+	nostr := Nostr{Relays: db.config.Relays}
 
-	// parse args
+	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
 	if err != nil {
+		fmt.Println(err.Error())
 		return
 	}
 
 	switch {
-	case opts["home"].(bool):
-		home(opts)
-	case opts["setprivate"].(bool):
-		// TODO make this read STDIN and encrypt the key locally
-		setPrivateKey(opts)
-		saveConfig(path)
-	case opts["sign"].(bool):
-		signEventJSON(opts)
-	case opts["verify"].(bool):
-		verifyEventJSON(opts)
-	case opts["public"].(bool):
-		showPublicKey(opts)
-	case opts["publish"].(bool):
-		publish(opts)
-	case opts["message"].(bool):
-		message(opts)
-	case opts["share-contacts"].(bool):
-		shareContacts(opts)
-	case opts["key-gen"].(bool):
-		keyGen(opts)
-	case opts["metadata"].(bool):
-		setMetadata(opts)
-	case opts["profile"].(bool):
-		showProfile(opts)
-	case opts["follow"].(bool):
-		follow(opts)
-		saveConfig(path)
-	case opts["unfollow"].(bool):
-		unfollow(opts)
-		saveConfig(path)
-	case opts["event"].(bool):
-		switch {
-		case opts["view"].(bool):
-			viewEvent(opts)
-		case opts["delete"].(bool):
-			deleteEvent(opts)
+	// View the event stream world
+	case opts["world"].(bool):
+		verbose, _ := opts.Bool("--verbose")
+		all_es, err := db.GetAllEventStreams()
+		if err != nil {
+			log.Panic(err.Error())
 		}
+		world(&db, nostr, all_es, verbose)
+
+	// Event stream auth
+	case opts["create"].(bool):
+		// TODO: make this read from stdin and encrypt private key in jsons
+		name := opts["<name>"].(string)
+		priv_key, _ := opts.String("<key>")
+		generate, _ := opts.Bool("--gen")
+		db.CreateEventStream(name, priv_key, generate)
+	case opts["remove"].(bool):
+		name := opts["<name>"].(string)
+		db.RemoveEventStream(name)
+		fmt.Printf("Removed %s stream.", name)
+	case opts["switch"].(bool):
+		name := opts["<name>"].(string)
+		db.SetActiveEventStream(name)
+	case opts["ll"].(bool):
+		require_active(&db)
+		all, _ := opts.Bool("-a")
+		db.ListEventStreams(all)
+
+	// View
+	case opts["log"].(bool):
+		require_active(&db)
+		es_active, _ := db.GetActiveStream()
+		pubkey := es_active.PubKey
+		if val, _ := opts["--name"]; val != nil {
+			pubkey, _ = db.GetPubForName(val.(string))
+		}
+		es, _ := db.GetEventStream(pubkey)
+		es.Print(true)
+	case opts["show"].(bool):
+		verbose, _ := opts.Bool("--verbose")
+		id := opts["<id>"].(string)
+		if id == "" {
+			log.Println("provided event ID was empty")
+			return
+		}
+		showEvent(&db, nostr, id, verbose)
+
+	// Core
+	case opts["append"].(bool):
+		require_active(&db)
+		es_active, _ := db.GetActiveStream()
+		content := opts["<content>"].(string)
+		ev, err := publishEvent(nostr, es_active.PrivKey, content, es_active.GetHead())
+		if err != nil {
+			log.Panic(err.Error())
+		}
+		es_active.Append(*ev)
+		db.SaveEventStream(es_active)
+	case opts["follow"].(bool):
+		pubkey := nip19.TranslatePublicKey(opts["<pubkey>"].(string))
+		name := opts["<name>"].(string)
+		db.FollowEventStream(nostr, pubkey, name)
+	case opts["unfollow"].(bool):
+		name := opts["<name>"].(string)
+		db.UnfollowEventStream(name)
+		fmt.Printf("Removed %s stream.", name)
+	case opts["sync"].(bool):
+		require_active(&db)
+		es, _ := db.GetActiveStream()
+		if val, _ := opts["<name>"]; val != nil {
+			pubkey, _ := db.GetPubForName(val.(string))
+			es, _ = db.GetEventStream(pubkey)
+		}
+		es.Sync(nostr)
+		db.SaveEventStream(es)
+
+	// Relay
 	case opts["relay"].(bool):
 		switch {
 		case opts["add"].(bool):
-			addRelay(opts)
-			saveConfig(path)
+			url := opts["<url>"].(string)
+			db.AddRelay(url)
 		case opts["remove"].(bool):
-			removeRelay(opts)
-			saveConfig(path)
-		case opts["recommend"].(bool):
-			recommendRelay(opts)
+			url := opts["<url>"].(string)
+			db.RemoveRelay(url)
 		default:
-			listRelays(opts)
+			db.ListRelays()
 		}
 	}
 }

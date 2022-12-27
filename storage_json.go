@@ -3,11 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/buger/jsonparser"
 	"github.com/mitchellh/go-homedir"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -137,6 +139,70 @@ func (db *LocalDB) GetEventStream(pubkey string) (EventStream, error) {
 	if err != nil {
 		return EventStream{}, err
 	}
+	f.Close()
+
+	// FIX: Below is an ugly hack to reopen the file and read "ots" field manually.
+	// While JSON encoder saved it, the decoder did not. Couldn't be bothered for a better solution atm.
+	// The fix is to avoid using another lib just to read "ots"...
+	data, _ := ioutil.ReadFile(path)
+
+	id_to_ots := make(map[string]string)
+
+	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		event_id_b, _, _, err := jsonparser.Get(value, "id")
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		ots_b, _, _, err := jsonparser.Get(value, "ots")
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		event_id := string(event_id_b)
+		ots := string(ots_b)
+		id_to_ots[event_id] = ots
+	}, "log")
+
+	// Set the "ots" field in the es.Log events
+	for _, ev := range es.Log {
+		if ots, ok := id_to_ots[ev.ID]; ok {
+			ev.SetExtra("ots", ots)
+		}
+		// event_id := "6393fc4a54e49d4d6ce44a59e2d864e59f2c2862510a5e4e2f99c71232b0358a"
+		// if ev.ID == event_id {
+		// 	os.WriteFile("/home/phyro/"+event_id, ev.Serialize(), 0644)
+		// }
+	}
+
+	// TMP: Upgrade OTS!
+	// fmt.Println("upgrading ots")
+	// upgraded_ots, _ := ots_upgrade(&es.Log[1])
+	// upgraded_ots_b64 := b64.StdEncoding.EncodeToString([]byte(upgraded_ots))
+	// es.Log[1].SetExtra("ots", upgraded_ots_b64)
+	// fmt.Printf("\nupgraded ots: %s", upgraded_ots)
+	// db.SaveEventStream(es)
+
+	// TMP: Is upgraded OTS? + verify
+	// for _, ev := range es.Log {
+	// 	fmt.Printf("\nEvent id: %s", ev.ID)
+	// 	fmt.Printf("\nots upgraded: %t\n", is_ots_upgraded(&ev))
+	// 	if is_ots_upgraded(&ev) {
+	// 		ok, err := ots_verify(&ev)
+	// 		if err != nil {
+	// 			log.Panic(err.Error())
+	// 		}
+	// 		if ok {
+	// 			fmt.Println("Verified!")
+	// 		} else {
+	// 			fmt.Println("FAILED to verify!")
+	// 		}
+	// 	}
+	// }
+
+	// TMP: rest getPubKey
+	// pub := getPubKey(es.PrivKey)
+	// fmt.Printf("\nPub1: %s\nPub2: %s\n", es.PubKey, pub)
+
 	return es, nil
 }
 
@@ -148,7 +214,9 @@ func (db *LocalDB) GetAllEventStreams() ([]EventStream, error) {
 		if err != nil {
 			log.Fatalf(err.Error())
 		}
-		if info.Name() == "nostr" || info.Name() == CONFIG_FILE {
+		splt := strings.Split(info.Name(), ".")
+		ext := splt[len(splt)-1]
+		if info.Name() == "nostr" || info.Name() == CONFIG_FILE || ext == "ots" {
 			return nil
 		}
 
@@ -290,14 +358,14 @@ func (db *LocalDB) GetPubForName(name string) (string, error) {
 	for _, es := range ess {
 		if es.Name == name {
 			if found {
-				return "", fmt.Errorf("Name conflict for name: %s\npub1: %s\npub2: %s\n", name, rv, es.PubKey)
+				return "", fmt.Errorf("name conflict for name: %s\npub1: %s\npub2: %s", name, rv, es.PubKey)
 			}
 			rv = es.PubKey
 			found = true
 		}
 	}
 	if !found {
-		return "", fmt.Errorf("Could not find stream with name: %s", name)
+		return "", fmt.Errorf("could not find stream with name: %s", name)
 	}
 	return rv, nil
 }

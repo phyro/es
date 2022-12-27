@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -19,25 +20,20 @@ var kindNames = map[int]string{
 	nostr.KindDeletion:               "Deletion Notice",
 }
 
-func showEvent(db *LocalDB, n Nostr, id string, verbose bool) {
+func findEvent(db *LocalDB, n Nostr, id string) *nostr.Event {
 	pool := n.ReadPool()
 
 	_, all := pool.Sub(nostr.Filters{{IDs: []string{id}}})
+	fmt.Printf("\nSearching event id: %s", id)
 	for event := range nostr.Unique(all) {
+		fmt.Printf("\nFound event id: %s", id)
 		if event.ID != id {
 			log.Printf("got unexpected event %s.\n", event.ID)
 			continue
 		}
-
-		// Check if we have a name for the event stream owner
-		var name *string
-		es, err := db.GetEventStream(event.PubKey)
-		if err == nil {
-			name = &es.Name
-		}
-		printEvent(event, name, verbose)
-		break
+		return &event
 	}
+	return nil
 }
 
 // Add event to my stream. In case there were no previous events on the Stream, make a genesis event.
@@ -76,6 +72,60 @@ func printPublishStatus(event *nostr.Event, statuses chan nostr.PublishStatus, r
 		remaining -= 1
 		if remaining == 0 {
 			return
+		}
+	}
+}
+
+// Find the next event in the hashchain (Verified sig check included)
+func findNextEvents(n Nostr, pubkey string, prev string) ([]*nostr.Event, error) {
+	pool := n.ReadPool()
+	// TODO: Smarter filter (created_at filter?)
+	_, events := pool.Sub(nostr.Filters{{Authors: []string{pubkey}}})
+
+	// fix this mess
+	events_chan := nostr.Unique(events)
+	out := false
+
+	go func() {
+		time.Sleep(2 * time.Second)
+		out = true
+	}()
+
+	result := []*nostr.Event{}
+	prev_to_event := map[string]nostr.Event{}
+
+	for {
+		if out {
+			// Construct a chain of events
+			for {
+				ev, ok := prev_to_event[prev]
+				if !ok {
+					return result, nil
+				}
+				result = append(result, &ev)
+				prev = ev.ID
+			}
+		}
+		select {
+		case event := <-events_chan:
+			for _, tag := range event.Tags {
+				if tag.Key() == "prev" {
+					ok, err := event.CheckSignature()
+					// both 'ok' needs to be true and err nil for a valid sig
+					if ok && err == nil {
+						val, exists := prev_to_event[tag.Value()]
+						if exists {
+							fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", val.ID, event.ID)
+							return nil, errors.New("Conflict")
+						}
+						prev_to_event[tag.Value()] = event
+					} else {
+						// We ignore events with invalid signature
+						fmt.Printf("\nFound an event with an invalid signature. Event id: %s", event.ID)
+					}
+				}
+			}
+		default:
 		}
 	}
 }

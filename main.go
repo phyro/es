@@ -25,6 +25,8 @@ Usage:
   es sync
   es log [--name=<name>]
   es show <id> [--verbose]
+  es ots upgrade <name>
+  es ots verify <name>
   es relay
   es relay add <url>
   es relay remove <url>
@@ -98,7 +100,14 @@ func main() {
 			log.Println("provided event ID was empty")
 			return
 		}
-		showEvent(&db, nostr, id, verbose)
+		ev := findEvent(&db, nostr, id)
+		// Check if we have a name for the event stream owner
+		var name *string
+		es, err := db.GetEventStream(ev.PubKey)
+		if err == nil {
+			name = &es.Name
+		}
+		printEvent(*ev, name, verbose)
 
 	// Core
 	case opts["append"].(bool):
@@ -128,6 +137,27 @@ func main() {
 		}
 		es.Sync(nostr)
 		db.SaveEventStream(es)
+
+	// OpenTimestamps
+	case opts["ots"].(bool):
+		name := opts["<name>"].(string)
+		pubkey, err := db.GetPubForName(name)
+		if err != nil {
+			log.Println(err.Error())
+			return
+		}
+		es, err := db.GetEventStream(pubkey)
+		if err != nil {
+			log.Println(err.Error())
+			return
+		}
+		switch {
+		case opts["upgrade"].(bool):
+			es.OTSUpgrade()
+			db.SaveEventStream(es)
+		case opts["verify"].(bool):
+			es.OTSVerify()
+		}
 
 	// Relay
 	case opts["relay"].(bool):

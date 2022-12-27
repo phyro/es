@@ -1,9 +1,15 @@
 (e)vent (s)tream
 =====
 
+_NOTE: This is a fork of [noscl](https://github.com/fiatjaf/noscl)._
+
 A minimal verifiable event stream client for [Nostr](https://github.com/fiatjaf/nostr).
 
-_NOTE: This is a fork of [noscl](https://github.com/fiatjaf/noscl)._
+For every event, observed or created, it verifies the following:
+- [x] Event signature
+- [x] Event linearity (hashchain)
+- [x] Event "ots" field provided
+
 
 ## Motivation
 
@@ -27,7 +33,7 @@ Following a user now simply means following their event stream. We ignore any an
 
 ## Installation
 
-Compile with `go install github.com/fiatjaf/noscl@latest` or [download a binary](https://github.com/fiatjaf/noscl/releases).
+Compile with `go install github.com/phyro/es@latest`.
 
 ## Usage
 

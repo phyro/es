@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"log"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 
 	"github.com/nbd-wtf/go-nostr/nip06"
 )
@@ -14,8 +14,8 @@ func getPubKey(privateKey string) string {
 		log.Printf("Error decoding key from hex: %s\n", err.Error())
 		return ""
 	} else {
-		_, pubkey := btcec.PrivKeyFromBytes(btcec.S256(), keyb)
-		return hex.EncodeToString(pubkey.X.Bytes())
+		_, pubkey := btcec.PrivKeyFromBytes(keyb)
+		return hex.EncodeToString(pubkey.X().Bytes())
 	}
 }
 

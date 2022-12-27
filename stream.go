@@ -1,10 +1,9 @@
 package main
 
 import (
-	"errors"
+	b64 "encoding/base64"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -15,7 +14,7 @@ type EventStream struct {
 	Name    string        `json:"name"`
 	PrivKey string        `json:"privkey"`
 	PubKey  string        `json:"pubkey"`
-	Log     []nostr.Event `json:"log,flow"`
+	Log     []nostr.Event `json:"log"`
 	// TODO: list of relays the stream can be fetched from
 }
 
@@ -36,6 +35,17 @@ func (es *EventStream) Append(ev nostr.Event) {
 		log.Printf("ERROR :: Append :: Signature verification failed for event: %s", ev.ID)
 		return
 	}
+	// Verify "prev" of the new event matches the last event id
+	last_event_id := es.Log[len(es.Log)-1].ID
+	prev := get_prev(ev)
+	if prev != last_event_id {
+		log.Printf("Reference to previous event mismatch. Last event id: %s, prev: %s", last_event_id, prev)
+	}
+
+	// Stamp with ots
+	ots_content := stamp(&ev)
+	ots_b64 := b64.StdEncoding.EncodeToString([]byte(ots_content))
+	ev.SetExtra("ots", ots_b64)
 
 	// Aal izz well, append event to the stream
 	es.Log = append(es.Log, ev)
@@ -48,8 +58,7 @@ func (es *EventStream) Sync(n Nostr) {
 
 	// Start from the genesis event and iterate forward
 	for {
-		pool := n.ReadPool()
-		events, err := findNextEvents(pool, es.PubKey, prev)
+		events, err := findNextEvents(n, es.PubKey, prev)
 		if err != nil {
 			fmt.Println(err.Error())
 			break
@@ -116,55 +125,53 @@ func (es *EventStream) GetHead() string {
 	}
 }
 
-// Find the next event in the hashchain (Verified sig check included)
-func findNextEvents(pool *nostr.RelayPool, pubkey string, prev string) ([]*nostr.Event, error) {
-	// TODO: Smarter filter (created_at filter?)
-	_, events := pool.Sub(nostr.Filters{{Authors: []string{pubkey}}})
-
-	// fix this mess
-	events_chan := nostr.Unique(events)
-	out := false
-
-	go func() {
-		time.Sleep(2 * time.Second)
-		out = true
-	}()
-
-	result := []*nostr.Event{}
-	prev_to_event := map[string]nostr.Event{}
-
-	for {
-		if out {
-			// Construct a chain of events
-			for {
-				ev, ok := prev_to_event[prev]
-				if !ok {
-					return result, nil
-				}
-				result = append(result, &ev)
-				prev = ev.ID
+func (es *EventStream) OTSUpgrade() {
+	for _, ev := range es.Log {
+		if !is_ots_upgraded(&ev) {
+			fmt.Printf("\nUpgrading OTS for event id: %s", ev.ID)
+			upgraded_ots, err := ots_upgrade(&ev)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
 			}
+			upgraded_ots_b64 := b64.StdEncoding.EncodeToString([]byte(upgraded_ots))
+			ev.SetExtra("ots", upgraded_ots_b64)
 		}
-		select {
-		case event := <-events_chan:
-			for _, tag := range event.Tags {
-				if tag.Key() == "prev" {
-					ok, err := event.CheckSignature()
-					// both 'ok' needs to be true and err nil for a valid sig
-					if ok && err == nil {
-						val, exists := prev_to_event[tag.Value()]
-						if exists {
-							fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", val.ID, event.ID)
-							return nil, errors.New("Conflict")
-						}
-						prev_to_event[tag.Value()] = event
-					} else {
-						// We ignore events with invalid signature
-						fmt.Printf("\nFound an event with an invalid signature. Event id: %s", event.ID)
-					}
-				}
+	}
+}
+
+func (es *EventStream) OTSVerify() {
+	// // First try to upgrade all OTS
+	// es.OTSUpgrade()
+
+	// for _, ev := range es.Log {
+	// 	fmt.Printf("\nVerifying OTS for event id: %s ;", ev.ID)
+	// 	if is_ots_upgraded(&ev) {
+	// 		ok, err := ots_verify(&ev)
+	// 		if err != nil {
+	// 			fmt.Printf("FAIL (error): %s", err.Error())
+	// 		}
+	// 		if ok {
+	// 			fmt.Printf("SUCCESS")
+	// 		} else {
+	// 			fmt.Printf("FAIL (verification failed)")
+	// 		}
+	// 	} else {
+	// 		fmt.Printf("FAIL (not upgraded)")
+	// 	}
+	// }
+
+	// TMP
+	for _, ev := range es.Log {
+		ok, err := ots_verify_direct(&ev)
+		if err != nil {
+			fmt.Println(err.Error())
+		} else {
+			if ok {
+				fmt.Println("successfully verified")
+			} else {
+				fmt.Println("failed verification")
 			}
-		default:
 		}
 	}
 }

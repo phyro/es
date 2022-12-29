@@ -27,6 +27,7 @@ Usage:
   es show <id> [--verbose]
   es ots upgrade <name>
   es ots verify <name>
+  es ots rpc <url> <user> <password>
   es relay
   es relay add <url>
   es relay remove <url>
@@ -140,23 +141,43 @@ func main() {
 
 	// OpenTimestamps
 	case opts["ots"].(bool):
-		name := opts["<name>"].(string)
-		pubkey, err := db.GetPubForName(name)
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
-		es, err := db.GetEventStream(pubkey)
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
 		switch {
 		case opts["upgrade"].(bool):
-			es.OTSUpgrade()
+			name := opts["<name>"].(string)
+			pubkey, err := db.GetPubForName(name)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			es, err := db.GetEventStream(pubkey)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			err = es.OTSUpgrade()
+			if err != nil {
+				log.Println(err.Error())
+			}
 			db.SaveEventStream(es)
 		case opts["verify"].(bool):
-			es.OTSVerify()
+			name := opts["<name>"].(string)
+			pubkey, err := db.GetPubForName(name)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			es, err := db.GetEventStream(pubkey)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			es.OTSVerify(db.config.BTCRPC)
+		case opts["rpc"].(bool):
+			host := opts["<url>"].(string)
+			user := opts["<user>"].(string)
+			password := opts["<password>"].(string)
+			db.ConfigureBitcoinRPC(host, user, password)
+			db.SaveConfig()
 		}
 
 	// Relay

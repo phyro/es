@@ -22,4 +22,7 @@ type StorageBackend interface {
 	AddRelay(string)
 	RemoveRelay(string)
 	ListRelays()
+
+	// OTS RPC
+	ConfigureBitcoinRPC(string, string, string)
 }

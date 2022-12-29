@@ -10,6 +10,13 @@ type Config struct {
 	Active  string            `json:"active"`
 	DataDir string            `json:"-"`
 	Relays  map[string]Policy `json:"relays,flow"`
+	BTCRPC  BTCRPCClient      `json:"btcrpc"`
+}
+
+type BTCRPCClient struct {
+	Host     string `json:"host"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 }
 
 type Policy struct {

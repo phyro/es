@@ -2,6 +2,7 @@ package main
 
 import (
 	b64 "encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 
@@ -47,7 +48,7 @@ func (es *EventStream) Append(ev nostr.Event) {
 	ots_b64 := b64.StdEncoding.EncodeToString([]byte(ots_content))
 	ev.SetExtra("ots", ots_b64)
 
-	// Aal izz well, append event to the stream
+	// Append event to the stream
 	es.Log = append(es.Log, ev)
 }
 
@@ -125,45 +126,27 @@ func (es *EventStream) GetHead() string {
 	}
 }
 
-func (es *EventStream) OTSUpgrade() {
-	for _, ev := range es.Log {
-		if !is_ots_upgraded(&ev) {
-			fmt.Printf("\nUpgrading OTS for event id: %s", ev.ID)
-			upgraded_ots, err := ots_upgrade(&ev)
-			if err != nil {
-				fmt.Println(err.Error())
-				continue
-			}
-			upgraded_ots_b64 := b64.StdEncoding.EncodeToString([]byte(upgraded_ots))
-			ev.SetExtra("ots", upgraded_ots_b64)
-		}
-	}
-}
-
-func (es *EventStream) OTSVerify() {
-	// // First try to upgrade all OTS
-	// es.OTSUpgrade()
-
+func (es *EventStream) OTSUpgrade() error {
 	// for _, ev := range es.Log {
-	// 	fmt.Printf("\nVerifying OTS for event id: %s ;", ev.ID)
-	// 	if is_ots_upgraded(&ev) {
-	// 		ok, err := ots_verify(&ev)
+	// 	if !is_ots_upgraded(&ev) {
+	// 		fmt.Printf("\nUpgrading OTS for event id: %s", ev.ID)
+	// 		_, err := ots_upgrade(&ev)
 	// 		if err != nil {
-	// 			fmt.Printf("FAIL (error): %s", err.Error())
+	// 			fmt.Println(err.Error())
+	// 			continue
 	// 		}
-	// 		if ok {
-	// 			fmt.Printf("SUCCESS")
-	// 		} else {
-	// 			fmt.Printf("FAIL (verification failed)")
-	// 		}
-	// 	} else {
-	// 		fmt.Printf("FAIL (not upgraded)")
+	// 		// TODO: Preserve the format of opentimestamps when saving Timestamp obj
+	// 		// upgraded_ots_b64 := b64.StdEncoding.EncodeToString([]byte(upgraded_ots))
+	// 		// ev.SetExtra("ots", upgraded_ots_b64)
 	// 	}
 	// }
 
-	// TMP
+	return errors.New("not implemented")
+}
+
+func (es *EventStream) OTSVerify(rpcclient BTCRPCClient) {
 	for _, ev := range es.Log {
-		ok, err := ots_verify_direct(&ev)
+		ok, err := ots_verify(&ev, rpcclient)
 		if err != nil {
 			fmt.Println(err.Error())
 		} else {

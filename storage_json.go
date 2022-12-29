@@ -142,8 +142,8 @@ func (db *LocalDB) GetEventStream(pubkey string) (EventStream, error) {
 	f.Close()
 
 	// FIX: Below is an ugly hack to reopen the file and read "ots" field manually.
-	// While JSON encoder saved it, the decoder did not. Couldn't be bothered for a better solution atm.
-	// The fix is to avoid using another lib just to read "ots"...
+	// While JSON encoder saved it, the decoder does not read it. Couldn't be bothered for a better solution atm.
+	// This should be fixed such that decoder handles "ots" field
 	data, _ := ioutil.ReadFile(path)
 
 	id_to_ots := make(map[string]string)
@@ -173,35 +173,6 @@ func (db *LocalDB) GetEventStream(pubkey string) (EventStream, error) {
 		// 	os.WriteFile("/home/phyro/"+event_id, ev.Serialize(), 0644)
 		// }
 	}
-
-	// TMP: Upgrade OTS!
-	// fmt.Println("upgrading ots")
-	// upgraded_ots, _ := ots_upgrade(&es.Log[1])
-	// upgraded_ots_b64 := b64.StdEncoding.EncodeToString([]byte(upgraded_ots))
-	// es.Log[1].SetExtra("ots", upgraded_ots_b64)
-	// fmt.Printf("\nupgraded ots: %s", upgraded_ots)
-	// db.SaveEventStream(es)
-
-	// TMP: Is upgraded OTS? + verify
-	// for _, ev := range es.Log {
-	// 	fmt.Printf("\nEvent id: %s", ev.ID)
-	// 	fmt.Printf("\nots upgraded: %t\n", is_ots_upgraded(&ev))
-	// 	if is_ots_upgraded(&ev) {
-	// 		ok, err := ots_verify(&ev)
-	// 		if err != nil {
-	// 			log.Panic(err.Error())
-	// 		}
-	// 		if ok {
-	// 			fmt.Println("Verified!")
-	// 		} else {
-	// 			fmt.Println("FAILED to verify!")
-	// 		}
-	// 	}
-	// }
-
-	// TMP: rest getPubKey
-	// pub := getPubKey(es.PrivKey)
-	// fmt.Printf("\nPub1: %s\nPub2: %s\n", es.PubKey, pub)
 
 	return es, nil
 }
@@ -330,7 +301,13 @@ func (db *LocalDB) ListRelays() {
 	}
 }
 
-// Returns (OwnedList, FollowedList) events streams
+func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string) {
+	db.config.BTCRPC.Host = host
+	db.config.BTCRPC.User = user
+	db.config.BTCRPC.Password = password
+}
+
+// Returns two lists: owned and followed events streams
 func (db *LocalDB) GetOwnedFollowedESS() ([]EventStream, []EventStream) {
 	ess, err := db.GetAllEventStreams()
 	if err != nil {

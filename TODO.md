@@ -1,9 +1,10 @@
 # TODO
 
+- encrypt private keys and ask for a password for `append, follow, unfollow` actions
+- potentially encrypt all the streams requiring a password for any action
 - make stream.go functions use the storage backend interface type
 - rename stream.go to core.go because syncing/appending/following event streams is the core functionality
 - load identity map (pubkey -> name) and use `<name> (<pubkey>)` throughout the app
-- OTS attestation for every event
 - test properties with multipass + multiple relays
 - bubbletea TUI
 - implement a proper backend storage i.e. sql or smth
@@ -14,6 +15,7 @@
 
 ### OTS
 
+- save the upgraded version to avoid querying opentimestamp for an event multiple times
 - verify the go-opentimestamps implementation (we should never say an event was attested at time T if it wasn't)
 - make OTS more robust (more calendars)
 - ideally hide the 'ots' commands from the user and do everything in the background

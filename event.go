@@ -40,8 +40,6 @@ func findEvent(db *LocalDB, n Nostr, id string) *nostr.Event {
 func publishEvent(n Nostr, priv_key string, content string, prev string) (*nostr.Event, error) {
 	pool := n.WritePool(priv_key)
 
-	// var tags nostr.Tags
-	// tags = append(tags, nostr.Tag{"prev", prev})
 	tags := nostr.Tags{nostr.Tag{"prev", prev}}
 
 	event, statuses, err := pool.PublishEvent(&nostr.Event{

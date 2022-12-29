@@ -15,6 +15,7 @@
 
 ### OTS
 
+- 'verify' should check that the events attestations follow each other (are linear)
 - save the upgraded version to avoid querying opentimestamp for an event multiple times
 - verify the go-opentimestamps implementation (we should never say an event was attested at time T if it wasn't)
 - make OTS more robust (more calendars)

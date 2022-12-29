@@ -68,6 +68,8 @@ $ es relay add wss://nostr-2.zebedee.cloud
 
 ## Generate an event stream
 
+An event stream is a linear sequence of events. We can create a new one with
+
 ```
 $ es create alice --gen
 alice (4945495bd1f52d67b48b8a8a0ec4157b5a742b3ba210b4a30cc61bb3ef97d060)
@@ -78,13 +80,16 @@ Private key: 37391bfacaa25ee6c4dce8328cc3a87d272a87842da43987c8b17bf138593660
 
 ## Set one event stream to active
 
+We need to set one of the event streams to active to be able to display or append to them. We can switch between the streams with
+
 ```
 $ es switch alice
 ```
 
 ## Display event streams
 
-Display event streams I own:
+Event streams are either streams we own the private key for, or streams we're following. We can list the former with
+
 ```
 $ es ll
 bob (5c7b2a3a0151a3a304aa2789fa66196bf0adc394be5d9828529ae878697946c6)
@@ -93,7 +98,7 @@ bob (5c7b2a3a0151a3a304aa2789fa66196bf0adc394be5d9828529ae878697946c6)
 
 We can see that alice is marked with `* ` which means this is the currently active event stream.
 
-We can also display all the event streams we follow:
+We can also display all the other event streams (i.e. the ones we follow) with
 ```
 $ es ll -a
 
@@ -151,6 +156,20 @@ HEAD (alice) at: 29f55d3e4eee8ee516935bf7e5c36f006756d3b94e665dfdc326c6dbfe863dd
 
 To sync other streams add `--name=alice` flag.
 
+#### Push stream
+
+We can push the stream we hold locally to our relays with
+```
+$ es push bob
+Pushing stream labeled as bob
+Sent event 6393fc4a54e49d4d6ce44a59e2d864e59f2c2862510a5e4e2f99c71232b0358a to 'wss://nostr-2.zebedee.cloud'.
+Sent event 52ba103a43528cf103ba301894587555d9fc2d9523eaf01fb7b5217164fdeb66 to 'wss://nostr-2.zebedee.cloud'.
+Sent event 199ebf8af64e8ad7a621f685ceedffb5977dea770f2018cbdec6f9d93ac5c0c2 to 'wss://nostr-2.zebedee.cloud'.
+Sent event 4e824123246daf8364ec21b9093d6267815a95cfb8ecbfebc4df6a36c7b9c61d to 'wss://nostr-2.zebedee.cloud'.
+Sent event 7fc22ad63d049a80ee1839499c7788abcbd594ffd6ff3828a0026bb3dd01988f to 'wss://nostr-2.zebedee.cloud'.
+Stream succesfully pushed.
+```
+
 #### Log
 
 We can view the hashchain of the event stream with
@@ -181,3 +200,27 @@ af9ea5419a85233df3ee327ee282092b34760d3c14494058cfd7bad377d6b698
 ```
 
 Note that this is a view of our local stream copy, it doesn't fetch the chain from relays. Similarly like with sync, we can see a log of any local event stream by using the flag `--name=eve`.
+
+#### OTS (OpenTimestamps)
+
+We stamp every event with [OpenTimestamps](https://opentimestamps.org/) by implementing [NIP-03](https://github.com/nostr-protocol/nips/blob/master/03.md). We also require every event to come with the "ots" field. This field can only be verified by validating the proof against the Bitcoin blockchain. To verify them, we first have to configure the connection to our bitcoin rpc. We do this with
+
+```
+$ es ots rpc localhost:8332 myuser mysupersecretpassword
+Bitcoin node version: 1
+Successfully configured Bitcoin RPC.
+```
+
+We can now verify the stamps of a stream with
+```
+$ es ots verify bob
+
+Event id: 6393fc4a54e49d4d6ce44a59e2d864e59f2c2862510a5e4e2f99c71232b0358a: Status: OK (2022-12-28 20:30:55 +0000 UTC)
+Event id: 52ba103a43528cf103ba301894587555d9fc2d9523eaf01fb7b5217164fdeb66: Status: OK (2022-12-28 20:30:55 +0000 UTC)
+Event id: 199ebf8af64e8ad7a621f685ceedffb5977dea770f2018cbdec6f9d93ac5c0c2: Status: OK (2022-12-28 20:30:55 +0000 UTC)
+Event id: 4e824123246daf8364ec21b9093d6267815a95cfb8ecbfebc4df6a36c7b9c61d: Status: OK (2022-12-28 23:16:55 +0000 UTC)
+Event id: 7fc22ad63d049a80ee1839499c7788abcbd594ffd6ff3828a0026bb3dd01988f: Status: OK (2022-12-29 15:36:02 +0000 UTC)
+Event id: 21c21487282fd7c72cf8a95396dfaec82fdb75433c6cc7b3e95ff7d46603cd6f: Status: PENDING
+```
+
+We can see the last event is pending. OpenTimestamps can take a few hours to get our proof on the Bitcoin blockchain. But if we try this tomorrow, it should validate.

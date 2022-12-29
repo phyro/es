@@ -37,24 +37,16 @@ func findEvent(db *LocalDB, n Nostr, id string) *nostr.Event {
 }
 
 // Add event to my stream. In case there were no previous events on the Stream, make a genesis event.
-func publishEvent(n Nostr, priv_key string, content string, prev string) (*nostr.Event, error) {
-	pool := n.WritePool(priv_key)
+func publishEvent(n Nostr, ev *nostr.Event) error {
+	pool := n.ReadPool()
 
-	tags := nostr.Tags{nostr.Tag{"prev", prev}}
-
-	event, statuses, err := pool.PublishEvent(&nostr.Event{
-		CreatedAt: time.Now(),
-		Kind:      nostr.KindTextNote,
-		Tags:      tags,
-		Content:   content,
-	})
+	event, statuses, err := pool.PublishEvent(ev)
 	if err != nil {
-		log.Printf("Error publishing: %s.\n", err.Error())
-		return nil, err
+		return fmt.Errorf("error publishing: %s", err.Error())
 	}
 
 	printPublishStatus(event, statuses, len(n.Relays))
-	return event, nil
+	return nil
 }
 
 func printPublishStatus(event *nostr.Event, statuses chan nostr.PublishStatus, remaining int) {
@@ -74,8 +66,23 @@ func printPublishStatus(event *nostr.Event, statuses chan nostr.PublishStatus, r
 	}
 }
 
+func publishStream(n Nostr, es EventStream) error {
+	last_published_id := "/"
+	for _, ev := range es.Log {
+		err := publishEvent(n, &ev)
+		if err != nil {
+			return fmt.Errorf("didn't manage to publish the event stream. Last published event ID: %s", last_published_id)
+		}
+		last_published_id = ev.ID
+		// Don't spam
+		time.Sleep(100 * time.Millisecond)
+	}
+	return nil
+}
+
 // Find the next event in the hashchain (Verified sig check included)
 func findNextEvents(n Nostr, pubkey string, prev string) ([]*nostr.Event, error) {
+	fmt.Printf("\nSearching for an event with pubkey: %s and prev: %s\n", pubkey, prev)
 	pool := n.ReadPool()
 	// TODO: Smarter filter (created_at filter?)
 	_, events := pool.Sub(nostr.Filters{{Authors: []string{pubkey}}})
@@ -166,8 +173,6 @@ func printEvent(evt nostr.Event, name *string, verbose bool) {
 	default:
 		fmt.Print(evt.Content)
 	}
-
-	fmt.Printf("\n")
 }
 
 func get_prev(evt nostr.Event) string {

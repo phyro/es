@@ -13,7 +13,7 @@ const USAGE = `es
 
 Usage:
   es world
-  es create <name> <key>
+  es create <name> <privkey>
   es create <name> [--gen]
   es remove <name>
   es switch <name>
@@ -23,6 +23,8 @@ Usage:
   es unfollow <name>
   es sync <name>
   es sync
+  es push <name>
+  es push
   es log [--name=<name>]
   es show <id> [--verbose]
   es ots upgrade <name>
@@ -63,13 +65,13 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		world(&db, nostr, all_es, verbose)
+		world(&db, nostr, all_es, verbose, db.config.BTCRPC)
 
 	// Event stream auth
 	case opts["create"].(bool):
 		// TODO: make this read from stdin and encrypt private key in jsons
 		name := opts["<name>"].(string)
-		priv_key, _ := opts.String("<key>")
+		priv_key, _ := opts.String("<privkey>")
 		generate, _ := opts.Bool("--gen")
 		db.CreateEventStream(name, priv_key, generate)
 	case opts["remove"].(bool):
@@ -115,16 +117,24 @@ func main() {
 		require_active(&db)
 		es_active, _ := db.GetActiveStream()
 		content := opts["<content>"].(string)
-		ev, err := publishEvent(nostr, es_active.PrivKey, content, es_active.GetHead())
+		ev, err := es_active.Create(content, db.config.BTCRPC)
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		es_active.Append(*ev)
+		err = publishEvent(nostr, ev)
+		if err != nil {
+			log.Panic(err.Error())
+		}
 		db.SaveEventStream(es_active)
 	case opts["follow"].(bool):
 		pubkey := nip19.TranslatePublicKey(opts["<pubkey>"].(string))
 		name := opts["<name>"].(string)
-		db.FollowEventStream(nostr, pubkey, name)
+		err := db.FollowEventStream(nostr, pubkey, name, db.config.BTCRPC)
+		if err != nil {
+			log.Panic(err.Error())
+		} else {
+			fmt.Println("ok")
+		}
 	case opts["unfollow"].(bool):
 		name := opts["<name>"].(string)
 		db.UnfollowEventStream(name)
@@ -136,8 +146,26 @@ func main() {
 			pubkey, _ := db.GetPubForName(val.(string))
 			es, _ = db.GetEventStream(pubkey)
 		}
-		es.Sync(nostr)
+		err := es.Sync(nostr, db.config.BTCRPC)
+		// We save first as we might have added a few new valid events before error
 		db.SaveEventStream(es)
+		if err != nil {
+			log.Panic(err.Error())
+		}
+
+	case opts["push"].(bool):
+		name := opts["<name>"].(string)
+		pubkey, _ := db.GetPubForName(name)
+		es, err := db.GetEventStream(pubkey)
+		if err != nil {
+			log.Panic(err.Error())
+		}
+		fmt.Printf("Pushing stream labeled as %s\n", name)
+		err = publishStream(nostr, es)
+		if err != nil {
+			log.Panic(err.Error())
+		}
+		fmt.Println("Stream succesfully pushed.")
 
 	// OpenTimestamps
 	case opts["ots"].(bool):
@@ -176,8 +204,14 @@ func main() {
 			host := opts["<url>"].(string)
 			user := opts["<user>"].(string)
 			password := opts["<password>"].(string)
-			db.ConfigureBitcoinRPC(host, user, password)
+			err := db.ConfigureBitcoinRPC(host, user, password)
+			if err != nil {
+				log.Printf("\nCould not connect, keeping old rpc settings. Error: %s", err.Error())
+				return
+			}
 			db.SaveConfig()
+			// TODO: add a ping to test
+			fmt.Println("Successfully configured Bitcoin RPC.")
 		}
 
 	// Relay

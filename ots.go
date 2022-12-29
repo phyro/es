@@ -5,17 +5,25 @@ import (
 	"crypto/sha256"
 	b64 "encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/mitchellh/go-homedir"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/phyro/go-opentimestamps/opentimestamps"
 	"github.com/phyro/go-opentimestamps/opentimestamps/client"
+)
+
+// Status
+var (
+	ErrOTSPending              = errors.New("pending")
+	ErrOTSWaitingConfirmations = errors.New("waiting for 5 confirmations")
 )
 
 const defaultCalendar = "https://alice.btc.calendar.opentimestamps.org"
@@ -89,7 +97,6 @@ func is_ots_upgraded(ev *nostr.Event) bool {
 func ots_upgrade(ev *nostr.Event) (*opentimestamps.Timestamp, error) {
 	ots_b64 := ev.GetExtra("ots").(string)
 	ots, err := b64.StdEncoding.DecodeString(ots_b64)
-	// fmt.Printf("\nold_ots: %s\n", ots)
 	if err != nil {
 		log.Panic(err.Error())
 	}
@@ -99,58 +106,52 @@ func ots_upgrade(ev *nostr.Event) (*opentimestamps.Timestamp, error) {
 	var upgraded *opentimestamps.Timestamp
 
 	for _, pts := range opentimestamps.PendingTimestamps(dts.Timestamp) {
-		fmt.Printf("; STATUS: ")
-		u, err := pts.Upgrade()
+		upgraded, err = pts.Upgrade()
 		if err != nil {
 			if strings.Contains(err.Error(), "Pending confirmation in Bitcoin blockchain") {
-				return nil, fmt.Errorf("pending")
+				return nil, ErrOTSPending
 			} else if strings.Contains(err.Error(), "waiting for 5 confirmations") {
-				return nil, fmt.Errorf("waiting for 5 confirmations")
+				return nil, ErrOTSWaitingConfirmations
 			} else {
-				fmt.Printf("error %v", err)
 				return nil, err
 			}
-		} else {
-			fmt.Printf("success")
 		}
-
 		// FIXME merge timestamp instead of replacing it
-		upgraded = u
-		fmt.Printf("\nUpgraded msg: %s\n", hex.EncodeToString(upgraded.Message))
-		return u, nil
+		return upgraded, nil
 	}
 
 	return nil, fmt.Errorf("OTS upgrade did not happen")
 }
 
-func ots_verify(ev *nostr.Event, rpcclient BTCRPCClient) (bool, error) {
+func ots_verify(ev *nostr.Event, rpcclient BTCRPCClient) (bool, *time.Time, error) {
 	// TODO: When upgrading .ots, save it to prevent fetching it every time.
 	// This might require updating the go-opentimestamps lib
 	upgraded, err := ots_upgrade(ev)
 	if err != nil {
-		return false, err
+		if err == ErrOTSPending { // || err == ErrOTSWaitingConfirmations {
+			return true, nil, err
+		}
+		// TODO: should we return "true" here if we get ErrOTSWaitingConfirmations?
+		return false, nil, err
 	}
 
 	// btcConn, err := newBtcConn("localhost:8332", "oohuser", "oohpass")
 	btcConn, err := newBtcConn(rpcclient.Host, rpcclient.User, rpcclient.Password)
 	if err != nil {
-		log.Fatalf("error creating btc connection: %v", err)
+		return false, nil, fmt.Errorf("error creating btc connection: %v", err)
 	}
 
 	verifier := client.NewBitcoinAttestationVerifier(btcConn)
 
 	ts, err := verifier.Verify(upgraded)
 	if err != nil {
-		log.Fatalf("error verifying timestamp: %v", err)
-		return false, err
+		return false, nil, fmt.Errorf("error verifying timestamp: %v", err)
 	}
 	if ts == nil {
-		fmt.Printf("no bitcoin-verifiable timestamps found\n")
-		return false, nil
+		return false, nil, fmt.Errorf("no bitcoin-verifiable timestamps found")
 	}
-	fmt.Printf("attested time: %v\n", ts)
 
-	return true, nil
+	return true, ts, nil
 }
 
 func newBtcConn(host, user, pass string) (*rpcclient.Client, error) {

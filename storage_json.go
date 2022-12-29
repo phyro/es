@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -219,15 +220,13 @@ func (db *LocalDB) SaveEventStream(es EventStream) error {
 }
 
 // Follow a stream of a pubkey - we start at the genesis event (NULL)
-func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string) {
+func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpcclient BTCRPCClient) error {
 	if pubkey == "" {
-		log.Println("Follow pubkey is empty! Exiting.")
-		return
+		return errors.New("follow pubkey is empty")
 	}
 
 	if name == "" {
-		log.Panic("Name can't be empty.")
-		return
+		return errors.New("name can't be empty")
 	}
 
 	es := EventStream{
@@ -244,8 +243,12 @@ func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string) {
 	}
 	fmt.Printf("Followed %s.\n", pubkey)
 
-	es.Sync(n)
+	err = es.Sync(n, rpcclient)
+	if err != nil {
+		return err
+	}
 	db.SaveEventStream(es)
+	return nil
 }
 
 // Unfollow a stream with a given name - equivalent to remove stream
@@ -301,10 +304,23 @@ func (db *LocalDB) ListRelays() {
 	}
 }
 
-func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string) {
+func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string) error {
 	db.config.BTCRPC.Host = host
 	db.config.BTCRPC.User = user
 	db.config.BTCRPC.Password = password
+
+	client, err := newBtcConn(host, user, password)
+	if err != nil {
+		return err
+	}
+
+	ver, err := client.BackendVersion()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Bitcoin node version: %d\n", ver)
+
+	return nil
 }
 
 // Returns two lists: owned and followed events streams

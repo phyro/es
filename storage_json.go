@@ -220,7 +220,7 @@ func (db *LocalDB) SaveEventStream(es EventStream) error {
 }
 
 // Follow a stream of a pubkey - we start at the genesis event (NULL)
-func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpcclient BTCRPCClient) error {
+func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpcclient *BTCRPCClient) error {
 	if pubkey == "" {
 		return errors.New("follow pubkey is empty")
 	}
@@ -305,9 +305,11 @@ func (db *LocalDB) ListRelays() {
 }
 
 func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string) error {
-	db.config.BTCRPC.Host = host
-	db.config.BTCRPC.User = user
-	db.config.BTCRPC.Password = password
+	db.config.BTCRPC = &BTCRPCClient{
+		Host:     host,
+		User:     user,
+		Password: password,
+	}
 
 	client, err := newBtcConn(host, user, password)
 	if err != nil {
@@ -321,6 +323,10 @@ func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string
 	fmt.Printf("Bitcoin node version: %d\n", ver)
 
 	return nil
+}
+
+func (db *LocalDB) UnsetBitcoinRPC() {
+	db.config.BTCRPC = nil
 }
 
 // Returns two lists: owned and followed events streams

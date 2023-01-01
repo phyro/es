@@ -82,6 +82,10 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/phyro/go-opentimestamps v0.0.0-20221229151518-8aadd4e3fd64 h1:pFk5pwrXK7mnZeVXBlhsekE0tddMaMGI+74sCw7qdqA=
 github.com/phyro/go-opentimestamps v0.0.0-20221229151518-8aadd4e3fd64/go.mod h1:+wdH0yRWPNTb7FBCbgXfuf1hzvbYw2mCMcgUoaoQkTk=
+github.com/phyro/go-opentimestamps v0.0.0-20230101115509-0e126cf6ff1c h1:1kcq5HYsgpWDDChXlh/FOa+mbdq40ZpDb7MKAoYBSPI=
+github.com/phyro/go-opentimestamps v0.0.0-20230101115509-0e126cf6ff1c/go.mod h1:+wdH0yRWPNTb7FBCbgXfuf1hzvbYw2mCMcgUoaoQkTk=
+github.com/phyro/go-opentimestamps v0.0.0-20230101120941-6d27e3979bc9 h1:dauxHVodcxfERwA9EKayllsQZarMi9UmUwH2s0AkMHo=
+github.com/phyro/go-opentimestamps v0.0.0-20230101120941-6d27e3979bc9/go.mod h1:+wdH0yRWPNTb7FBCbgXfuf1hzvbYw2mCMcgUoaoQkTk=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sirupsen/logrus v1.9.0 h1:trlNQbNUG3OdDrDil03MCb1H2o9nJ1x4/5LYw7byDE0=

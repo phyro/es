@@ -5,9 +5,12 @@ import (
 	"crypto/sha256"
 	b64 "encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,13 +23,20 @@ import (
 	"github.com/phyro/go-opentimestamps/opentimestamps/client"
 )
 
-// Status
 var (
 	ErrOTSPending              = errors.New("pending")
 	ErrOTSWaitingConfirmations = errors.New("waiting for 5 confirmations")
 )
 
 const defaultCalendar = "https://alice.btc.calendar.opentimestamps.org"
+
+type BlockchainInfoResp struct {
+	Blocks []BlocksResp `json:"blocks"`
+}
+type BlocksResp struct {
+	MerkleRoot string `json:"mrkl_root"`
+	Timestamp  int    `json:"time"`
+}
 
 func stamp(ev *nostr.Event) string {
 	cal, err := opentimestamps.NewRemoteCalendar(defaultCalendar)
@@ -123,18 +133,29 @@ func ots_upgrade(ev *nostr.Event) (*opentimestamps.Timestamp, error) {
 	return nil, fmt.Errorf("OTS upgrade did not happen")
 }
 
-func ots_verify(ev *nostr.Event, rpcclient BTCRPCClient) (bool, *time.Time, error) {
+func ots_verify(ev *nostr.Event, rpcclient *BTCRPCClient) (bool, *time.Time, error) {
 	// TODO: When upgrading .ots, save it to prevent fetching it every time.
 	// This might require updating the go-opentimestamps lib
 	upgraded, err := ots_upgrade(ev)
 	if err != nil {
-		if err == ErrOTSPending { // || err == ErrOTSWaitingConfirmations {
+		if err == ErrOTSPending {
 			return true, nil, err
 		}
-		// TODO: should we return "true" here if we get ErrOTSWaitingConfirmations?
+		if err == ErrOTSWaitingConfirmations {
+			return true, nil, err
+		}
 		return false, nil, err
 	}
 
+	if rpcclient != nil {
+		return ots_verify_rpc(upgraded, *rpcclient)
+	}
+	// We have no bitcoin RPC client set. Query blockchain.info and output merkle root hashes
+	// for manual verification in case the site isn't trusted
+	return ots_verify_manual(upgraded)
+}
+
+func ots_verify_rpc(upgraded *opentimestamps.Timestamp, rpcclient BTCRPCClient) (bool, *time.Time, error) {
 	// btcConn, err := newBtcConn("localhost:8332", "oohuser", "oohpass")
 	btcConn, err := newBtcConn(rpcclient.Host, rpcclient.User, rpcclient.Password)
 	if err != nil {
@@ -154,6 +175,49 @@ func ots_verify(ev *nostr.Event, rpcclient BTCRPCClient) (bool, *time.Time, erro
 	return true, ts, nil
 }
 
+// Make a GET request on blockchain.info to fetch the merkle root and verifies the expected merkle root against that
+func ots_verify_manual(upgraded *opentimestamps.Timestamp) (bool, *time.Time, error) {
+	verifier := client.NewBitcoinAttestationVerifier(nil)
+
+	atts, err := verifier.VerifyManual(upgraded)
+	if err != nil {
+		return false, nil, fmt.Errorf("error verifying timestamp: %v", err)
+	}
+
+	// Make get requests on blockchain.info to verify against the merkle root
+	base_url := "https://blockchain.info/block-height/"
+	for _, att := range atts {
+		expected_mekle_root := b2lx(att.ExpectedMerkleRoot)
+		fmt.Printf("\nChecking if block at height: %d has merkle root: %s", att.Height, expected_mekle_root)
+
+		url := fmt.Sprintf("%s%d%s", base_url, att.Height, "?format=json")
+		res, err := http.Get(url)
+		if err != nil {
+			return false, nil, err
+		}
+		defer res.Body.Close()
+		body, readErr := ioutil.ReadAll(res.Body)
+		if readErr != nil {
+			log.Fatal(readErr)
+		}
+
+		// Read and compare merkle root
+		var result BlockchainInfoResp
+		json.Unmarshal(body, &result)
+		binfo_merkle_root := result.Blocks[0].MerkleRoot
+		if expected_mekle_root == binfo_merkle_root {
+			// Parse block timestamp from blockchain.info json
+			ts := time.Unix(int64(result.Blocks[0].Timestamp), 0).UTC()
+			return true, &ts, nil
+		} else {
+			return false, nil, fmt.Errorf("merkle root mismatch. Expected: %s, got: %s", expected_mekle_root, binfo_merkle_root)
+		}
+
+	}
+
+	return true, nil, nil
+}
+
 func newBtcConn(host, user, pass string) (*rpcclient.Client, error) {
 	connCfg := &rpcclient.ConnConfig{
 		Host:         host,
@@ -163,4 +227,14 @@ func newBtcConn(host, user, pass string) (*rpcclient.Client, error) {
 		DisableTLS:   true,
 	}
 	return rpcclient.New(connCfg, nil)
+}
+
+// Convert to little endian hex
+func b2lx(b []byte) string {
+	// Reverse the slice
+	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
+		b[i], b[j] = b[j], b[i]
+	}
+	// Encode the reversed slice as a hex string
+	return hex.EncodeToString(b)
 }

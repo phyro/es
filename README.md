@@ -203,7 +203,7 @@ Note that this is a view of our local stream copy, it doesn't fetch the chain fr
 
 #### OTS (OpenTimestamps)
 
-We stamp every event with [OpenTimestamps](https://opentimestamps.org/) by implementing [NIP-03](https://github.com/nostr-protocol/nips/blob/master/03.md). We also require every event to come with the "ots" field. This field can only be verified by validating the proof against the Bitcoin blockchain. To verify them, we first have to configure the connection to our bitcoin rpc. We do this with
+We stamp every event with [OpenTimestamps](https://opentimestamps.org/) by implementing [NIP-03](https://github.com/nostr-protocol/nips/blob/master/03.md). We also require every event to come with the "ots" field. This field can only be verified by validating the proof against the Bitcoin blockchain. To verify them, we can either rely on comparing the block merkle root from what blockchain.info tells us or we configure the connection to our bitcoin rpc. By default we'll query blockchain.info. If we want to trust only our bitcoin node and speed up verification, we set the rpc node with
 
 ```
 $ es ots rpc localhost:8332 myuser mysupersecretpassword

@@ -30,6 +30,7 @@ Usage:
   es ots upgrade <name>
   es ots verify <name>
   es ots rpc <url> <user> <password>
+  es ots norpc
   es relay
   es relay add <url>
   es relay remove <url>
@@ -212,6 +213,9 @@ func main() {
 			db.SaveConfig()
 			// TODO: add a ping to test
 			fmt.Println("Successfully configured Bitcoin RPC.")
+		case opts["norpc"].(bool):
+			db.UnsetBitcoinRPC()
+			db.SaveConfig()
 		}
 
 	// Relay

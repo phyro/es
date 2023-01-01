@@ -7,7 +7,7 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-func world(db *LocalDB, n Nostr, event_streams []EventStream, verbose bool, rpcclient BTCRPCClient) {
+func world(db *LocalDB, n Nostr, event_streams []EventStream, verbose bool, rpcclient *BTCRPCClient) {
 	if len(event_streams) == 0 {
 		log.Println("You need to be following at least one stream to run 'world'")
 		return
@@ -28,7 +28,7 @@ func world(db *LocalDB, n Nostr, event_streams []EventStream, verbose bool, rpcc
 	}
 }
 
-func sync_all(n Nostr, ess []EventStream, rpcclient BTCRPCClient) {
+func sync_all(n Nostr, ess []EventStream, rpcclient *BTCRPCClient) {
 	fmt.Println("Syncing event streams. This may take a while...")
 	for _, es := range ess {
 		es.Sync(n, rpcclient)
@@ -37,7 +37,7 @@ func sync_all(n Nostr, ess []EventStream, rpcclient BTCRPCClient) {
 	fmt.Println("\nEvent streams synced.")
 }
 
-func handle_event(db *LocalDB, ev nostr.Event, rpcclient BTCRPCClient) {
+func handle_event(db *LocalDB, ev nostr.Event, rpcclient *BTCRPCClient) {
 	// Find the expected head of the event stream
 	es, err := db.GetEventStream(ev.PubKey)
 	if err != nil {

@@ -20,7 +20,7 @@ type EventStream struct {
 	// TODO: list of relays the stream can be fetched from
 }
 
-func (es *EventStream) Create(content string, rpcclient BTCRPCClient) (*nostr.Event, error) {
+func (es *EventStream) Create(content string, rpcclient *BTCRPCClient) (*nostr.Event, error) {
 	if es.PrivKey == "" {
 		return nil, fmt.Errorf("can't create an event. No private key for this stream is set")
 	}
@@ -54,7 +54,7 @@ func (es *EventStream) Create(content string, rpcclient BTCRPCClient) (*nostr.Ev
 	return &event, nil
 }
 
-func (es *EventStream) Append(ev nostr.Event, rpcclient BTCRPCClient) error {
+func (es *EventStream) Append(ev nostr.Event, rpcclient *BTCRPCClient) error {
 	// Check pubkey and verify signature
 	if ev.PubKey != es.PubKey {
 		return fmt.Errorf("can't append event from pubkey %s to stream with pubkey %s", ev.PubKey, es.PubKey)
@@ -103,7 +103,7 @@ func (es *EventStream) Append(ev nostr.Event, rpcclient BTCRPCClient) error {
 }
 
 // Sync a stream - find the latest HEAD and query for the next event of the stream and repeat
-func (es *EventStream) Sync(n Nostr, rpcclient BTCRPCClient) error {
+func (es *EventStream) Sync(n Nostr, rpcclient *BTCRPCClient) error {
 	fmt.Printf("Syncing %s ... ", es.Name)
 	prev := es.GetHead()
 
@@ -205,7 +205,7 @@ func (es *EventStream) OTSUpgrade() error {
 // Verifies two things:
 // 1. Every event must have an attestation
 // 2. Events must have linear attested time
-func (es *EventStream) OTSVerify(rpcclient BTCRPCClient) {
+func (es *EventStream) OTSVerify(rpcclient *BTCRPCClient) {
 	last_attestation_time := time.Time{}
 	last_attestation_event_id := "/"
 	for _, ev := range es.Log {
@@ -221,6 +221,9 @@ func (es *EventStream) OTSVerify(rpcclient BTCRPCClient) {
 				last_attestation_event_id = ev.ID
 			}
 		}
+	}
+	if rpcclient == nil {
+		fmt.Println("\nNOTE: In case you don't trust blockchain.info, verify the merkle root hashes manually.")
 	}
 }
 

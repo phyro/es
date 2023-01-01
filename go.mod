@@ -10,7 +10,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nbd-wtf/go-nostr v0.9.0
-	github.com/phyro/go-opentimestamps v0.0.0-20221229151518-8aadd4e3fd64
+	github.com/phyro/go-opentimestamps v0.0.0-20230101120941-6d27e3979bc9
 )
 
 require (

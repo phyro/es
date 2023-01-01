@@ -40,6 +40,19 @@ func findEvent(db *LocalDB, n Nostr, id string) *nostr.Event {
 func publishEvent(n Nostr, ev *nostr.Event) error {
 	pool := n.ReadPool()
 
+	// TMP
+	// ev2 := nostr.Event{
+	// 	ID:        ev.ID,
+	// 	PubKey:    ev.PubKey,
+	// 	CreatedAt: ev.CreatedAt,
+	// 	Kind:      ev.Kind,
+	// 	Tags:      ev.Tags,
+	// 	Content:   ev.Content,
+	// 	Sig:       ev.Sig,
+	// }
+	fmt.Println(ev.GetExtra("ots"))
+	// FIX: the problem is likely here https://github.com/nbd-wtf/go-nostr/blob/master/event_aux.go#L72-L74
+
 	event, statuses, err := pool.PublishEvent(ev)
 	if err != nil {
 		return fmt.Errorf("error publishing: %s", err.Error())
@@ -97,6 +110,7 @@ func findNextEvents(n Nostr, pubkey string, prev string) ([]*nostr.Event, error)
 	}()
 
 	result := []*nostr.Event{}
+	// Mapping from prev value to event struct. Used to construct the sequence that we return
 	prev_to_event := map[string]nostr.Event{}
 
 	for {
@@ -115,6 +129,7 @@ func findNextEvents(n Nostr, pubkey string, prev string) ([]*nostr.Event, error)
 		case event := <-events_chan:
 			for _, tag := range event.Tags {
 				if tag.Key() == "prev" {
+					fmt.Printf("\nGot event, ots: %s", event.GetExtraString("ots"))
 					ok, err := event.CheckSignature()
 					// both 'ok' needs to be true and err nil for a valid sig
 					if ok && err == nil {

@@ -23,4 +23,6 @@
 
 # Maybe
 
+- load balance requests to relays. Since we have a linear chain, we no longer need to fetch the same data from every relay. We simply fetch data from the first one, build the chain forward and ask the next relay to continue from our new head until we are no longer extending the chain. If we have ordered events, it's redundant to ask multiple relays for the same data because we can verify there are no missing parts.
+- create a local MMR from the events. This way, we could construct an inclusion proof for any event.
 - handle derived streams i.e. `es create facebook --from="alice"` which derives the private key from alice's private key with `H(alice_priv || "damus")`. This way we can create many separate event streams while only needing to save a single password.

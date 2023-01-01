@@ -8,7 +8,7 @@ A minimal verifiable event stream client for [Nostr](https://github.com/fiatjaf/
 For every event, observed or created, it verifies the following:
 - [x] Event signature
 - [x] Event linearity (hashchain)
-- [x] Event "ots" field provided
+- [x] Event "ots" field is provided and verified
 
 
 ## Motivation
@@ -22,7 +22,7 @@ Order verification is, like signature verification, done on the client side. An 
 - **Missing event detection** - Fetching data for someone we follow could leave us with some missing events. This is impossible to detect today, but is easy to detect if the event stream forms a hashchain. This can help detect relays censoring certain events (i.e. a tweet) by serving the event only to users from some geopolitical region or decreasing the visibility rate of the event by serving it to every 10th user. Detection of missing events could make the follower query other relays to find the missind pieces or contact the user to republish their event chain.
 
 
-Since we have no global linear event sequence like a blockchain does, we can't really agree on the order of events, but it's possible to find conflicts in the user event chain and thus prove they were not honestly publishing their events.
+Since we have no global linear event sequence like a blockchain does, we can't really agree on the order of events, but it's possible to find conflicts in the user event chain and thus prove they were not honestly publishing their events. Ordering may also reduce the load on relays as we don't need to query every relay for all the messages. We can now see if things are missing and from what point on we might need events.
 
 ## How
 

@@ -35,6 +35,7 @@ func (es *EventStream) Create(content string, rpcclient *BTCRPCClient) (*nostr.E
 		PubKey:    es.PubKey,
 	}
 
+	// Sign the event
 	err := event.Sign(es.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("error signing event: %w", err)
@@ -45,7 +46,7 @@ func (es *EventStream) Create(content string, rpcclient *BTCRPCClient) (*nostr.E
 	ots_b64 := b64.StdEncoding.EncodeToString([]byte(ots_content))
 	event.SetExtra("ots", ots_b64)
 
-	// We append the event as soon as it is created. This also puts an OTS stamp on it.
+	// We append the event as soon as it is created. This verifies all the event stream properties are present
 	err = es.Append(event, rpcclient)
 	if err != nil {
 		return nil, err
@@ -77,12 +78,11 @@ func (es *EventStream) Append(ev nostr.Event, rpcclient *BTCRPCClient) error {
 		}
 	}
 
+	// Verifying "ots" before appending gives us a guarantee that every stream will have attestations
+	// Additonally, we check if the attestation is linear in case we get attested time.
 	if ev.GetExtraString("ots") == "" {
 		return fmt.Errorf("event is missing the \"ots\" field")
 	}
-
-	// Verifying "ots" before appending gives us a guarantee that every stream will have attestations
-	// Additonally, we check if the attestation is linear in case we get attested time.
 	is_good, attested_time, err := ots_verify(&ev, rpcclient)
 	if !is_good {
 		return err
@@ -99,6 +99,7 @@ func (es *EventStream) Append(ev nostr.Event, rpcclient *BTCRPCClient) error {
 
 	// Append event to the stream
 	es.Log = append(es.Log, ev)
+
 	return nil
 }
 
@@ -106,7 +107,6 @@ func (es *EventStream) Append(ev nostr.Event, rpcclient *BTCRPCClient) error {
 func (es *EventStream) Sync(n Nostr, rpcclient *BTCRPCClient) error {
 	fmt.Printf("Syncing %s ... ", es.Name)
 	prev := es.GetHead()
-
 	// Start from the genesis event and iterate forward
 	for {
 		events, err := findNextEvents(n, es.PubKey, prev)
@@ -128,6 +128,7 @@ func (es *EventStream) Sync(n Nostr, rpcclient *BTCRPCClient) error {
 		}
 	}
 	fmt.Printf("Done\nHEAD (%s) at: %s", es.Name, es.GetHead())
+
 	return nil
 }
 
@@ -138,7 +139,9 @@ func (es *EventStream) Print(show_chain bool) {
 	}
 	indent := "\t\t\t"
 	fmt.Printf("\nEvent stream:\n")
+	fmt.Printf("----------------------------------------------------------\n")
 	fmt.Printf("\n%s%s", indent, GENESIS)
+	fmt.Printf("\n----------------------------------------------------------\n")
 	if es.Size() == 0 {
 		return
 	}
@@ -147,7 +150,7 @@ func (es *EventStream) Print(show_chain bool) {
 	fmt.Printf("\n%sv\n", indent)
 	for idx, event := range es.Log {
 		fmt.Printf("----------------------------------------------------------\n")
-		printEvent(event, &es.Name, false)
+		printEvent(event, &es.Name, true)
 		fmt.Printf("\n----------------------------------------------------------\n")
 		if idx != es.Size()-1 {
 			fmt.Printf("\n%s|", indent)
@@ -185,20 +188,6 @@ func (es *EventStream) GetHead() string {
 }
 
 func (es *EventStream) OTSUpgrade() error {
-	// for _, ev := range es.Log {
-	// 	if !is_ots_upgraded(&ev) {
-	// 		fmt.Printf("\nUpgrading OTS for event id: %s", ev.ID)
-	// 		_, err := ots_upgrade(&ev)
-	// 		if err != nil {
-	// 			fmt.Println(err.Error())
-	// 			continue
-	// 		}
-	// 		// TODO: Preserve the format of opentimestamps when saving Timestamp obj
-	// 		// upgraded_ots_b64 := b64.StdEncoding.EncodeToString([]byte(upgraded_ots))
-	// 		// ev.SetExtra("ots", upgraded_ots_b64)
-	// 	}
-	// }
-
 	return errors.New("not implemented")
 }
 

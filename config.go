@@ -9,7 +9,7 @@ var config Config
 type Config struct {
 	Active  string        `json:"active"`
 	DataDir string        `json:"-"`
-	Relays  []string      `json:"relays,flow"`
+	Relays  []string      `json:"relays"`
 	BTCRPC  *BTCRPCClient `json:"btcrpc"`
 }
 

@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/buger/jsonparser"
 	"github.com/mitchellh/go-homedir"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -29,17 +27,15 @@ func (db *LocalDB) Init() {
 	// Make config folder
 	base_dir_exp, _ := homedir.Expand(BASE_DIR)
 	os.Mkdir(base_dir_exp, 0700)
-
 	path := filepath.Join(base_dir_exp, CONFIG_FILE)
-	f, err := os.Open(path)
-
+	_, err := os.Open(path)
 	if err != nil {
 		// File doesn't exist, create it
 		db.config = Config{DataDir: base_dir_exp}
 		db.SaveConfig()
-		f, _ = os.Open(path)
+		_, _ = os.Open(path)
 	}
-	f, _ = os.Open(path)
+	f, _ := os.Open(path)
 	err = json.NewDecoder(f).Decode(&db.config)
 	if err != nil {
 		log.Fatal("can't parse config file " + path + ": " + err.Error())
@@ -57,7 +53,6 @@ func (db *LocalDB) SaveConfig() {
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-
 	enc.Encode(db.config)
 }
 
@@ -122,6 +117,7 @@ func (db *LocalDB) SetActiveEventStream(name string) error {
 	}
 	db.config.Active = pubkey
 	db.SaveConfig()
+
 	return nil
 }
 
@@ -141,39 +137,6 @@ func (db *LocalDB) GetEventStream(pubkey string) (EventStream, error) {
 		return EventStream{}, err
 	}
 	f.Close()
-
-	// FIX: Below is an ugly hack to reopen the file and read "ots" field manually.
-	// While JSON encoder saved it, the decoder does not read it. Couldn't be bothered for a better solution atm.
-	// This should be fixed such that decoder handles "ots" field
-	data, _ := ioutil.ReadFile(path)
-
-	id_to_ots := make(map[string]string)
-
-	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		event_id_b, _, _, err := jsonparser.Get(value, "id")
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		ots_b, _, _, err := jsonparser.Get(value, "ots")
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-
-		event_id := string(event_id_b)
-		ots := string(ots_b)
-		id_to_ots[event_id] = ots
-	}, "log")
-
-	// Set the "ots" field in the es.Log events
-	for _, ev := range es.Log {
-		if ots, ok := id_to_ots[ev.ID]; ok {
-			ev.SetExtra("ots", ots)
-		}
-		// event_id := "6393fc4a54e49d4d6ce44a59e2d864e59f2c2862510a5e4e2f99c71232b0358a"
-		// if ev.ID == event_id {
-		// 	os.WriteFile("/home/phyro/"+event_id, ev.Serialize(), 0644)
-		// }
-	}
 
 	return es, nil
 }
@@ -199,12 +162,12 @@ func (db *LocalDB) GetAllEventStreams() ([]EventStream, error) {
 		result = append(result, es)
 		return nil
 	})
+
 	return result, nil
 }
 
 func (db *LocalDB) SaveEventStream(es EventStream) error {
 	path := pathForPubKey("stream", es.PubKey)
-
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal("can't open config file " + path + ": " + err.Error())
@@ -213,7 +176,6 @@ func (db *LocalDB) SaveEventStream(es EventStream) error {
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-
 	enc.Encode(es)
 
 	return nil
@@ -224,7 +186,6 @@ func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpccli
 	if pubkey == "" {
 		return errors.New("follow pubkey is empty")
 	}
-
 	if name == "" {
 		return errors.New("name can't be empty")
 	}
@@ -235,19 +196,20 @@ func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpccli
 		PubKey:  pubkey,
 		Log:     []nostr.Event{},
 	}
-	es.Print(false)
-
 	err := db.SaveEventStream(es)
 	if err != nil {
 		log.Panic(err.Error())
 	}
 	fmt.Printf("Followed %s.\n", pubkey)
 
+	// Sync the event stream
 	err = es.Sync(n, rpcclient)
 	if err != nil {
 		return err
 	}
+	es.Print(false)
 	db.SaveEventStream(es)
+
 	return nil
 }
 
@@ -258,7 +220,6 @@ func (db *LocalDB) UnfollowEventStream(name string) {
 
 func (db *LocalDB) ListEventStreams(include_followed bool) error {
 	active_es, err := db.GetActiveStream()
-
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -270,7 +231,6 @@ func (db *LocalDB) ListEventStreams(include_followed bool) error {
 		}
 		es.Print(false)
 	}
-
 	if include_followed {
 		fmt.Printf("\n------------------------------------\n")
 		fmt.Printf("Following:")
@@ -309,8 +269,8 @@ func (db *LocalDB) RemoveRelay(url string) {
 }
 
 func (db *LocalDB) ListRelays() {
-	for relay, policy := range db.config.Relays {
-		fmt.Printf("%s: %s\n", relay, policy)
+	for _, relay_url := range db.config.Relays {
+		fmt.Printf("Url: %s\n", relay_url)
 	}
 }
 
@@ -320,12 +280,10 @@ func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string
 		User:     user,
 		Password: password,
 	}
-
 	client, err := newBtcConn(host, user, password)
 	if err != nil {
 		return err
 	}
-
 	ver, err := client.BackendVersion()
 	if err != nil {
 		return err

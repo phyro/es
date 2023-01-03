@@ -1,6 +1,6 @@
 # TODO
 
-- add relay pooling
+- add per stream relay pooling
 - encrypt private keys and ask for a password for `append, follow, unfollow` actions
 - potentially encrypt all the streams requiring a password for any action
 - make stream.go functions use the storage backend interface type
@@ -16,7 +16,6 @@
 
 ### OTS
 
-- 'verify' should check that the events attestations follow each other (are linear)
 - save the upgraded version to avoid querying opentimestamp for an event multiple times
 - verify the go-opentimestamps implementation (we should never say an event was attested at time T if it wasn't)
 - make OTS more robust (more calendars)

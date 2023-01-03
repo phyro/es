@@ -30,6 +30,7 @@ var (
 
 const defaultCalendar = "https://alice.btc.calendar.opentimestamps.org"
 
+// The response of blockchain.info request
 type BlockchainInfoResp struct {
 	Blocks []BlocksResp `json:"blocks"`
 }
@@ -38,15 +39,14 @@ type BlocksResp struct {
 	Timestamp  int    `json:"time"`
 }
 
+// OpenTimestamps an event and return the stamp data
 func stamp(ev *nostr.Event) string {
 	cal, err := opentimestamps.NewRemoteCalendar(defaultCalendar)
 	if err != nil {
 		log.Fatalf("error creating remote calendar: %v", err)
 	}
-
 	digest_32 := sha256.Sum256(ev.Serialize())
 	digest := digest_32[:]
-
 	base_path, _ := homedir.Expand(BASE_DIR)
 	// We will save the .ots in <event_id>.ots
 	path := filepath.Join(base_path, ev.ID)
@@ -55,6 +55,7 @@ func stamp(ev *nostr.Event) string {
 		log.Fatalf("error creating output file: %v", err)
 	}
 
+	// Create a timestamp
 	dts, err := opentimestamps.CreateDetachedTimestampForHash(digest, cal)
 	if err != nil {
 		log.Fatalf(
@@ -62,15 +63,14 @@ func stamp(ev *nostr.Event) string {
 			path, err,
 		)
 	}
-
 	if err := dts.WriteToStream(outFile); err != nil {
 		log.Fatalf("error writing detached timestamp: %v", err)
 	}
-
 	buf := new(bytes.Buffer)
 	if err := dts.WriteToStream(buf); err != nil {
 		log.Fatalf("error writing detached timestamp to buf: %v", err)
 	}
+
 	return buf.String()
 }
 
@@ -101,6 +101,7 @@ func is_ots_upgraded(ev *nostr.Event) bool {
 	}
 	// This means we didn't find any of the tags...
 	log.Panicf("\nFound no ots tags for event id: %s", ev.ID)
+
 	return false
 }
 
@@ -114,7 +115,6 @@ func ots_upgrade(ev *nostr.Event) (*opentimestamps.Timestamp, error) {
 	dts, _ := opentimestamps.NewDetachedTimestampFromReader(ots_reader)
 
 	var upgraded *opentimestamps.Timestamp
-
 	for _, pts := range opentimestamps.PendingTimestamps(dts.Timestamp) {
 		upgraded, err = pts.Upgrade()
 		if err != nil {
@@ -156,14 +156,12 @@ func ots_verify(ev *nostr.Event, rpcclient *BTCRPCClient) (bool, *time.Time, err
 }
 
 func ots_verify_rpc(upgraded *opentimestamps.Timestamp, rpcclient BTCRPCClient) (bool, *time.Time, error) {
-	// btcConn, err := newBtcConn("localhost:8332", "oohuser", "oohpass")
 	btcConn, err := newBtcConn(rpcclient.Host, rpcclient.User, rpcclient.Password)
 	if err != nil {
 		return false, nil, fmt.Errorf("error creating btc connection: %v", err)
 	}
 
 	verifier := client.NewBitcoinAttestationVerifier(btcConn)
-
 	ts, err := verifier.Verify(upgraded)
 	if err != nil {
 		return false, nil, fmt.Errorf("error verifying timestamp: %v", err)
@@ -178,7 +176,6 @@ func ots_verify_rpc(upgraded *opentimestamps.Timestamp, rpcclient BTCRPCClient) 
 // Make a GET request on blockchain.info to fetch the merkle root and verifies the expected merkle root against that
 func ots_verify_manual(upgraded *opentimestamps.Timestamp) (bool, *time.Time, error) {
 	verifier := client.NewBitcoinAttestationVerifier(nil)
-
 	atts, err := verifier.VerifyManual(upgraded)
 	if err != nil {
 		return false, nil, fmt.Errorf("error verifying timestamp: %v", err)
@@ -212,7 +209,6 @@ func ots_verify_manual(upgraded *opentimestamps.Timestamp) (bool, *time.Time, er
 		} else {
 			return false, nil, fmt.Errorf("merkle root mismatch. Expected: %s, got: %s", expected_mekle_root, binfo_merkle_root)
 		}
-
 	}
 
 	return true, nil, nil

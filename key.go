@@ -27,7 +27,6 @@ func keyGen() (string, string, error) {
 	}
 
 	seed := nip06.SeedFromWords(seedWords)
-
 	sk, err := nip06.PrivateKeyFromSeed(seed)
 	if err != nil {
 		log.Println(err)

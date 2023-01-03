@@ -17,7 +17,7 @@ When we use voice to communicate, we encode information in a linear sequence. Vo
 
 The idea is to bring linearity to Nostr events by treating events as an append-only event stream. Why should we worry about ordering at all?
 
-Order verification is, like signature verification, done on the client side. An ordered event stream achieves two following properties:
+Order verification is, like signature verification, done on the client side. An ordered event stream achieves following properties:
 - **Unforgeable history** - Following a user ensures they can't silently inject an event in the past. This holds true even for an attacker that steals your private key. Today, an attacker could create past events and try to forge history. With unforgeable history, the attacker can only append events and now the owner can append an event on the stream that signals key revocation. Any and all events identified on top of this chain can be ignored.
 - **Missing event detection** - Fetching data for someone we follow could leave us with some missing events. This is impossible to detect today, but is easy to detect if the event stream forms a hashchain. This can help detect relays censoring certain events (i.e. a tweet) by serving the event only to users from some geopolitical region or decreasing the visibility rate of the event by serving it to every 10th user. Detection of missing events could make the follower query other relays to find the missind pieces or contact the user to republish their event chain.
 
@@ -41,8 +41,8 @@ Compile with `go install github.com/phyro/es@latest`.
 es
 
 Usage:
-  es home [--verbose]
-  es create <name> <key>
+  es world
+  es create <name> <privkey>
   es create <name> [--gen]
   es remove <name>
   es switch <name>
@@ -50,9 +50,16 @@ Usage:
   es append <content>
   es follow <name> <pubkey>
   es unfollow <name>
-  es sync [-a]
+  es sync <name>
+  es sync
+  es push <name>
+  es push
   es log [--name=<name>]
   es show <id> [--verbose]
+  es ots upgrade <name>
+  es ots verify <name>
+  es ots rpc <url> <user> <password>
+  es ots norpc
   es relay
   es relay add <url>
   es relay remove <url>
@@ -72,7 +79,7 @@ An event stream is a linear sequence of events. We can create a new one with
 
 ```
 $ es create alice --gen
-alice (4945495bd1f52d67b48b8a8a0ec4157b5a742b3ba210b4a30cc61bb3ef97d060)
+alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
 
 Seed: illegal subway say over clean uphold liquid acid tired tilt reunion expect hand harsh ritual stock breeze pulse cattle tobacco galaxy surge peanut phone 
 Private key: 37391bfacaa25ee6c4dce8328cc3a87d272a87842da43987c8b17bf138593660
@@ -93,7 +100,7 @@ Event streams are either streams we own the private key for, or streams we're fo
 ```
 $ es ll
 bob (5c7b2a3a0151a3a304aa2789fa66196bf0adc394be5d9828529ae878697946c6)
-* alice (ea1ef60519f531b5296c5fa14459a83faf3079b5ab2ec018d35c9d73f971fe29)
+* alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
 ```
 
 We can see that alice is marked with `* ` which means this is the currently active event stream.
@@ -103,13 +110,13 @@ We can also display all the other event streams (i.e. the ones we follow) with
 $ es ll -a
 
 bob (5c7b2a3a0151a3a304aa2789fa66196bf0adc394be5d9828529ae878697946c6)
-* alice (ea1ef60519f531b5296c5fa14459a83faf3079b5ab2ec018d35c9d73f971fe29)
+* alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
 
 ------------------------------------
 Following:
 ------------------------------------
 bob (5c7b2a3a0151a3a304aa2789fa66196bf0adc394be5d9828529ae878697946c6)
-alice (ea1ef60519f531b5296c5fa14459a83faf3079b5ab2ec018d35c9d73f971fe29)
+alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
 eve_ (fae519376ad3ea4274cc258c45abfcae1f679b9189d1443ea1cec3358cd0cf04)
 ```
 
@@ -151,7 +158,7 @@ To get up to date event stream hashchain of the currently active stream run
 ```
 $ es sync
 Syncing alice ... Done
-HEAD (alice) at: 29f55d3e4eee8ee516935bf7e5c36f006756d3b94e665dfdc326c6dbfe863dd0
+HEAD (alice) at: cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58
 ```
 
 To sync other streams add `--name=alice` flag.
@@ -175,35 +182,59 @@ Stream succesfully pushed.
 We can view the hashchain of the event stream with
 ```
 $ es log
-alice (ea1ef60519f531b5296c5fa14459a83faf3079b5ab2ec018d35c9d73f971fe29)
+alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
 
 Event stream:
+----------------------------------------------------------
+
 			NULL
+----------------------------------------------------------
+
 			|
 			v
-9580244c7cd5a29d9c988a48d8a0968936c33c838355020d9f0831e2079138bb
+----------------------------------------------------------
+Id: 4590e9e8d239303663aba2b1dd2ee98186e716fb9653769e629e138547146385
+Prev: NULL
+Author: alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
+Date: 58 minutes ago
+Date proof (ots): AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIRZDp6NI5MDZjq6Kx3S7pgYbnFvuWU3aeYp4ThUcUY4XwEK07NTp4lG8YdS1OxPC7BqcI8SBkr8mpkM5SFlNjkJN62lnrsUgH5JQbeV1ElflW6TcfOwjxBGO0cffwCC+6rZN0rb4LAIPf4w0u+QyOLi1odHRwczovL2FsaWNlLmJ0Yy5jYWxlbmRhci5vcGVudGltZXN0YW1wcy5vcmc=
+Type: Text Note
+
+  Hi l1
+----------------------------------------------------------
+
 			|
 			v
-15fcf8d7bbb639cf318704e8a2d7be5bd96f5f10d735834d383e93e213920fde
+----------------------------------------------------------
+Id: c814d931e97feb00ee4d2e02202e8c10eda3c1079a427db248aea19d66761e74
+Prev: 4590e9e8d239303663aba2b1dd2ee98186e716fb9653769e629e138547146385
+Author: alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
+Date: 57 minutes ago
+Date proof (ots): AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIyBTZMel/6wDuTS4CIC6MEO2jwQeaQn2ySK6hnWZ2HnTwEIrWuKgf5PZZzeDlBrLu9bsI8SBdRwQUEoJN2MqONATTE368muQCEZD2ZHYNgFbSxwXOgAjwIBpOs2fu7RGS6gov1BZDLT5ANzxGIgZGzkMlKgJ/175RCPEEY7RyKvAIvilgeEA2EcYAg9/jDS75DI4uLWh0dHBzOi8vYWxpY2UuYnRjLmNhbGVuZGFyLm9wZW50aW1lc3RhbXBzLm9yZw==
+Type: Text Note
+
+  Hi l2
+----------------------------------------------------------
+
 			|
 			v
-af9ea5419a85233df3ee327ee282092b34760d3c14494058cfd7bad377d6b698
-			|
-			v
-7b32b990e140a77ed2405abb95427e6b2c0de2858f041a9bae55af87863b8ca9
-			|
-			v
-6929908abab77da3017bf6c8c2fb05ac0625b2fcd5f16146eb5f7abe167793e6
-			|
-			v
-29f55d3e4eee8ee516935bf7e5c36f006756d3b94e665dfdc326c6dbfe863dd0
+----------------------------------------------------------
+Id: dd4803da9aa55645ebba1b0370759b003c867876271af2a1388f8d6651907285
+Prev: c814d931e97feb00ee4d2e02202e8c10eda3c1079a427db248aea19d66761e74
+Author: alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
+Date: 10 minutes ago
+Date proof (ots): AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEI3UgD2pqlVkXruhsDcHWbADyGeHYnGvKhOI+NZlGQcoXwEKFgz911FDX8E/VclS4hEL0I8CC8tkFsy08gJVWKzGL4UManRAG0EdWlJD0ikjQgTTM8EAjxBGO0fWbwCBocxJ74fWeLAIPf4w0u+QyOLi1odHRwczovL2FsaWNlLmJ0Yy5jYWxlbmRhci5vcGVudGltZXN0YW1wcy5vcmc=
+Type: Text Note
+
+  Hi l3
+----------------------------------------------------------
 ```
 
 Note that this is a view of our local stream copy, it doesn't fetch the chain from relays. Similarly like with sync, we can see a log of any local event stream by using the flag `--name=eve`.
 
 #### OTS (OpenTimestamps)
 
-We stamp every event with [OpenTimestamps](https://opentimestamps.org/) by implementing [NIP-03](https://github.com/nostr-protocol/nips/blob/master/03.md). We also require every event to come with the "ots" field. This field can only be verified by validating the proof against the Bitcoin blockchain. To verify them, we can either rely on comparing the block merkle root from what blockchain.info tells us or we configure the connection to our bitcoin rpc. By default we'll query blockchain.info. If we want to trust only our bitcoin node and speed up verification, we set the rpc node with
+We stamp every event with [OpenTimestamps](https://opentimestamps.org/) by implementing [NIP-03](https://github.com/nostr-protocol/nips/blob/master/03.md). We also require every event to come with the "ots" field. This field can only be verified by validating the proof against the Bitcoin blockchain. To verify them, we can either rely on comparing the block merkle root with what blockchain.info reports or we configure the connection to our own bitcoin rpc. By default we'll query blockchain.info for the block merkle roots. If we want to trust only our bitcoin node and speed up verification, we set the rpc node with
 
 ```
 $ es ots rpc localhost:8332 myuser mysupersecretpassword

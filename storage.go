@@ -12,7 +12,7 @@ type StorageBackend interface {
 	GetEventStream(string) (EventStream, error)
 	GetAllEventStreams() ([]EventStream, error)
 	SaveEventStream(EventStream) error
-	FollowEventStream(Nostr, string, string)
+	FollowEventStream(Nostr, string, string, *BTCRPCClient) error
 	UnfollowEventStream(string)
 
 	// Misc
@@ -24,5 +24,5 @@ type StorageBackend interface {
 	ListRelays()
 
 	// OTS RPC
-	ConfigureBitcoinRPC(string, string, string)
+	ConfigureBitcoinRPC(string, string, string) error
 }

@@ -1,17 +1,14 @@
 module github.com/phyro/es
 
-replace github.com/nbd-wtf/go-nostr => /home/phyro/github/go-nostr
-
 go 1.18
 
 require (
 	github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0
-	github.com/buger/jsonparser v1.1.1
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/dustin/go-humanize v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/nbd-wtf/go-nostr v0.10.1-0.20230101235843-4a62a753e674
+	github.com/nbd-wtf/go-nostr v0.10.1-0.20230103174721-03973952619f
 	github.com/phyro/go-opentimestamps v0.0.0-20230101120941-6d27e3979bc9
 )
 

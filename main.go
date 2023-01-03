@@ -105,7 +105,11 @@ func main() {
 			log.Println("provided event ID was empty")
 			return
 		}
-		ev := findEvent(&db, n, id)
+		ev, err := findEvent(&db, &n, id)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 		// Check if we have a name for the event stream owner
 		var name *string
 		es, err := db.GetEventStream(ev.PubKey)
@@ -128,6 +132,7 @@ func main() {
 			log.Panic(err.Error())
 		}
 		db.SaveEventStream(es_active)
+		fmt.Println("Added event:", ev.ID)
 	case opts["follow"].(bool):
 		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
@@ -212,7 +217,6 @@ func main() {
 				return
 			}
 			db.SaveConfig()
-			// TODO: add a ping to test
 			fmt.Println("Successfully configured Bitcoin RPC.")
 		case opts["norpc"].(bool):
 			db.UnsetBitcoinRPC()

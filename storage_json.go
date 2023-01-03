@@ -74,7 +74,7 @@ func (db *LocalDB) CreateEventStream(name string, priv_key string, generate bool
 	if generate {
 		seed, key, _ = keyGen()
 	}
-	es := EventStream{
+	es := &EventStream{
 		Name:    name,
 		PrivKey: key,
 		PubKey:  getPubKey(key),
@@ -122,29 +122,32 @@ func (db *LocalDB) SetActiveEventStream(name string) error {
 }
 
 // Get the active account
-func (db *LocalDB) GetActiveStream() (EventStream, error) {
+func (db *LocalDB) GetActiveStream() (*EventStream, error) {
 	pubkey := db.config.Active
+	if pubkey == "" {
+		return nil, errors.New("No active stream set.")
+	}
 	return db.GetEventStream(pubkey)
 }
 
 // Get a specific event stream stored locally
-func (db *LocalDB) GetEventStream(pubkey string) (EventStream, error) {
+func (db *LocalDB) GetEventStream(pubkey string) (*EventStream, error) {
 	var es EventStream
 	path := pathForPubKey("stream", pubkey)
 	f, _ := os.Open(path)
 	err := json.NewDecoder(f).Decode(&es)
 	if err != nil {
-		return EventStream{}, err
+		return nil, err
 	}
 	f.Close()
 
-	return es, nil
+	return &es, nil
 }
 
 // Get all event streams stored locally
-func (db *LocalDB) GetAllEventStreams() ([]EventStream, error) {
+func (db *LocalDB) GetAllEventStreams() ([]*EventStream, error) {
 	base_path, _ := homedir.Expand(BASE_DIR)
-	var result []EventStream
+	var result []*EventStream
 	filepath.Walk(base_path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Fatalf(err.Error())
@@ -166,7 +169,7 @@ func (db *LocalDB) GetAllEventStreams() ([]EventStream, error) {
 	return result, nil
 }
 
-func (db *LocalDB) SaveEventStream(es EventStream) error {
+func (db *LocalDB) SaveEventStream(es *EventStream) error {
 	path := pathForPubKey("stream", es.PubKey)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
@@ -182,7 +185,7 @@ func (db *LocalDB) SaveEventStream(es EventStream) error {
 }
 
 // Follow a stream of a pubkey - we start at the genesis event (NULL)
-func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpcclient *BTCRPCClient) error {
+func (db *LocalDB) FollowEventStream(n *Nostr, pubkey string, name string, rpcclient *BTCRPCClient) error {
 	if pubkey == "" {
 		return errors.New("follow pubkey is empty")
 	}
@@ -190,7 +193,7 @@ func (db *LocalDB) FollowEventStream(n Nostr, pubkey string, name string, rpccli
 		return errors.New("name can't be empty")
 	}
 
-	es := EventStream{
+	es := &EventStream{
 		Name:    name,
 		PrivKey: "", // we don't own the stream, merely follow it
 		PubKey:  pubkey,
@@ -268,10 +271,12 @@ func (db *LocalDB) RemoveRelay(url string) {
 	}
 }
 
-func (db *LocalDB) ListRelays() {
-	for _, relay_url := range db.config.Relays {
-		fmt.Printf("Url: %s\n", relay_url)
-	}
+func (db *LocalDB) ListRelays() []string {
+	return db.config.Relays
+}
+
+func (db *LocalDB) GetBitcoinRPC() *BTCRPCClient {
+	return db.config.BTCRPC
 }
 
 func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string) error {
@@ -289,21 +294,23 @@ func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string
 		return err
 	}
 	fmt.Printf("Bitcoin node version: %d\n", ver)
+	db.SaveConfig()
 
 	return nil
 }
 
 func (db *LocalDB) UnsetBitcoinRPC() {
 	db.config.BTCRPC = nil
+	db.SaveConfig()
 }
 
 // Returns two lists: owned and followed events streams
-func (db *LocalDB) GetOwnedFollowedESS() ([]EventStream, []EventStream) {
+func (db *LocalDB) GetOwnedFollowedESS() ([]*EventStream, []*EventStream) {
 	ess, err := db.GetAllEventStreams()
 	if err != nil {
 		log.Panic(err.Error())
 	}
-	owned := make([]EventStream, 0)
+	owned := make([]*EventStream, 0)
 	for _, es := range ess {
 		if es.PrivKey != "" {
 			owned = append(owned, es)

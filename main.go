@@ -38,9 +38,10 @@ All pubkeys passed should *NOT* be bech32 encoded.
 `
 
 // Fails if we have no active event stream (required for appending etc.)
-func require_active(db *LocalDB) {
-	if db.config.Active == "" {
-		log.Panic("Please set an active stream with `es switch <name>`.")
+func require_active(db StorageBackend) {
+	_, err := db.GetActiveStream()
+	if err != nil {
+		log.Panic(err.Error())
 	}
 }
 
@@ -48,9 +49,10 @@ func main() {
 	flag.Parse()
 	log.SetPrefix("<> ")
 
-	db := LocalDB{}
-	db.Init()
-	n := NewNostr(db.config.Relays)
+	json_db := LocalDB{}
+	json_db.Init()
+	db := NewStreamStore(&json_db)
+	n := NewNostr(db.ListRelays())
 
 	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
@@ -67,7 +69,7 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		world(&db, n, all_es, verbose, db.config.BTCRPC)
+		world(db, &n, all_es, verbose)
 
 	// Event stream auth
 	case opts["create"].(bool):
@@ -84,13 +86,13 @@ func main() {
 		name := opts["<name>"].(string)
 		db.SetActiveEventStream(name)
 	case opts["ll"].(bool):
-		require_active(&db)
+		require_active(db)
 		all, _ := opts.Bool("-a")
 		db.ListEventStreams(all)
 
 	// View
 	case opts["log"].(bool):
-		require_active(&db)
+		require_active(db)
 		es_active, _ := db.GetActiveStream()
 		pubkey := es_active.PubKey
 		if val, _ := opts["--name"]; val != nil {
@@ -105,7 +107,7 @@ func main() {
 			log.Println("provided event ID was empty")
 			return
 		}
-		ev, err := findEvent(&db, &n, id)
+		ev, err := findEvent(db, &n, id)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -120,14 +122,14 @@ func main() {
 
 	// Core
 	case opts["append"].(bool):
-		require_active(&db)
+		require_active(db)
 		es_active, _ := db.GetActiveStream()
 		content := opts["<content>"].(string)
-		ev, err := es_active.Create(content, db.config.BTCRPC)
+		ev, err := es_active.Create(content, db.GetBitcoinRPC())
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		err = publishEvent(n, ev)
+		err = publishEvent(&n, ev)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -136,7 +138,7 @@ func main() {
 	case opts["follow"].(bool):
 		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
-		err := db.FollowEventStream(n, pubkey, name, db.config.BTCRPC)
+		err := db.FollowEventStream(&n, pubkey, name, db.GetBitcoinRPC())
 		if err != nil {
 			log.Panic(err.Error())
 		} else {
@@ -147,13 +149,13 @@ func main() {
 		db.UnfollowEventStream(name)
 		fmt.Printf("Removed %s stream.", name)
 	case opts["sync"].(bool):
-		require_active(&db)
+		require_active(db)
 		es, _ := db.GetActiveStream()
 		if val, _ := opts["<name>"]; val != nil {
 			pubkey, _ := db.GetPubForName(val.(string))
 			es, _ = db.GetEventStream(pubkey)
 		}
-		err := es.Sync(n, db.config.BTCRPC)
+		err := es.Sync(&n, db.GetBitcoinRPC())
 		// We save first as we might have added a few new valid events before error
 		db.SaveEventStream(es)
 		if err != nil {
@@ -168,7 +170,7 @@ func main() {
 			log.Panic(err.Error())
 		}
 		fmt.Printf("Pushing stream labeled as %s\n", name)
-		err = publishStream(n, es)
+		err = publishStream(&n, es)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -206,7 +208,7 @@ func main() {
 				log.Println(err.Error())
 				return
 			}
-			es.OTSVerify(db.config.BTCRPC)
+			es.OTSVerify(db.GetBitcoinRPC())
 		case opts["rpc"].(bool):
 			host := opts["<url>"].(string)
 			user := opts["<user>"].(string)
@@ -216,11 +218,9 @@ func main() {
 				log.Printf("\nCould not connect, keeping old rpc settings. Error: %s", err.Error())
 				return
 			}
-			db.SaveConfig()
 			fmt.Println("Successfully configured Bitcoin RPC.")
 		case opts["norpc"].(bool):
 			db.UnsetBitcoinRPC()
-			db.SaveConfig()
 		}
 
 	// Relay
@@ -233,7 +233,9 @@ func main() {
 			url := opts["<url>"].(string)
 			db.RemoveRelay(url)
 		default:
-			db.ListRelays()
+			for _, relay_url := range db.ListRelays() {
+				fmt.Println("Url:", relay_url)
+			}
 		}
 	}
 }

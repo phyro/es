@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -34,6 +35,24 @@ func (n *Nostr) SingleQuery(filter nostr.Filter) []nostr.Event {
 
 	r := n.Relays[0]
 	return r.QuerySync(ctx, filter)
+}
+
+func (n *Nostr) Listen(ctx context.Context, evt_chan chan nostr.Event, filter nostr.Filter) {
+	for _, r := range n.Relays {
+		sub := r.Subscribe(ctx, nostr.Filters{filter})
+		// Initiate subscriptions in go threads and delegate results to event channel
+		go func() {
+			for {
+				select {
+				case ev := <-sub.Events:
+					evt_chan <- ev
+				case <-ctx.Done():
+					sub.Unsub()
+					fmt.Println("Closing sub")
+				}
+			}
+		}()
+	}
 }
 
 func (n *Nostr) PublishEvent(ev nostr.Event) nostr.Status {

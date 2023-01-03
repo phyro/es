@@ -12,6 +12,12 @@ import (
 
 const GENESIS = "NULL"
 
+type BTCRPCClient struct {
+	Host     string `json:"host"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
 type EventStream struct {
 	Name    string        `json:"name"`
 	PrivKey string        `json:"privkey"`
@@ -104,7 +110,7 @@ func (es *EventStream) Append(ev nostr.Event, rpcclient *BTCRPCClient) error {
 }
 
 // Sync a stream - find the latest HEAD and query for the next event of the stream and repeat
-func (es *EventStream) Sync(n Nostr, rpcclient *BTCRPCClient) error {
+func (es *EventStream) Sync(n *Nostr, rpcclient *BTCRPCClient) error {
 	fmt.Printf("Syncing %s ... ", es.Name)
 	prev := es.GetHead()
 	// Start from the genesis event and iterate forward
@@ -119,7 +125,6 @@ func (es *EventStream) Sync(n Nostr, rpcclient *BTCRPCClient) error {
 			break
 		}
 		for _, ev := range events {
-			fmt.Println("found it!!!!!!!!!!!1")
 			err = es.Append(*ev, rpcclient)
 			if err != nil {
 				return err
@@ -140,20 +145,20 @@ func (es *EventStream) Print(show_chain bool) {
 	indent := "\t\t\t"
 	fmt.Printf("\nEvent stream:\n")
 	fmt.Printf("----------------------------------------------------------\n")
-	fmt.Printf("\n%s%s", indent, GENESIS)
+	fmt.Printf("%s%s", indent, GENESIS)
 	fmt.Printf("\n----------------------------------------------------------\n")
 	if es.Size() == 0 {
 		return
 	}
 
-	fmt.Printf("\n%s|", indent)
+	fmt.Printf("%s|", indent)
 	fmt.Printf("\n%sv\n", indent)
 	for idx, event := range es.Log {
 		fmt.Printf("----------------------------------------------------------\n")
 		printEvent(event, &es.Name, true)
 		fmt.Printf("\n----------------------------------------------------------\n")
 		if idx != es.Size()-1 {
-			fmt.Printf("\n%s|", indent)
+			fmt.Printf("%s|", indent)
 			fmt.Printf("\n%sv\n", indent)
 		}
 	}

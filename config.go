@@ -13,12 +13,6 @@ type Config struct {
 	BTCRPC  *BTCRPCClient `json:"btcrpc"`
 }
 
-type BTCRPCClient struct {
-	Host     string `json:"host"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-}
-
 func (c *Config) Init() {
 	if c.Relays == nil {
 		c.Relays = []string{}

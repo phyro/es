@@ -20,7 +20,7 @@ var kindNames = map[int]string{
 	nostr.KindDeletion:               "Deletion Notice",
 }
 
-func findEvent(db *LocalDB, n *Nostr, id string) (*nostr.Event, error) {
+func findEvent(db StorageBackend, n *Nostr, id string) (*nostr.Event, error) {
 	fmt.Printf("\nSearching event id: %s", id)
 	for _, event := range n.SingleQuery(nostr.Filter{IDs: []string{id}}) {
 		if event.ID != id {
@@ -34,7 +34,7 @@ func findEvent(db *LocalDB, n *Nostr, id string) (*nostr.Event, error) {
 }
 
 // Add event to my stream. In case there were no previous events on the Stream, make a genesis event.
-func publishEvent(n Nostr, ev *nostr.Event) error {
+func publishEvent(n *Nostr, ev *nostr.Event) error {
 	status := n.PublishEvent(*ev)
 	if status != 1 {
 		return fmt.Errorf("error publishing event. Status: %s", status)
@@ -43,7 +43,7 @@ func publishEvent(n Nostr, ev *nostr.Event) error {
 	return nil
 }
 
-func publishStream(n Nostr, es EventStream) error {
+func publishStream(n *Nostr, es *EventStream) error {
 	last_published_id := "/"
 	for _, ev := range es.Log {
 		err := publishEvent(n, &ev)
@@ -59,7 +59,7 @@ func publishStream(n Nostr, es EventStream) error {
 }
 
 // Find the next events in the hashchain
-func findNextEvents(n Nostr, pubkey string, prev string) ([]*nostr.Event, error) {
+func findNextEvents(n *Nostr, pubkey string, prev string) ([]*nostr.Event, error) {
 	result := []*nostr.Event{}
 	// Mapping from prev value to event struct. Used to construct the sequence that we return
 	prev_to_event := map[string]nostr.Event{}
@@ -111,8 +111,7 @@ func printEvent(evt nostr.Event, name *string, verbose bool) {
 	fmt.Printf("Id: %s\n", ID)
 	fmt.Printf("Prev: %s\n", prev)
 	fmt.Printf("Author: %s\n", fromField)
-	fmt.Printf("Date: %s\n", humanize.Time(evt.CreatedAt))
-	fmt.Printf("Date proof (ots): %s\n", evt.GetExtraString("ots"))
+	fmt.Printf("Date: %s (✓)\n", humanize.Time(evt.CreatedAt))
 	fmt.Printf("Type: %s\n", kind)
 	fmt.Printf("\n")
 

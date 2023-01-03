@@ -186,44 +186,37 @@ alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
 
 Event stream:
 ----------------------------------------------------------
-
 			NULL
 ----------------------------------------------------------
-
 			|
 			v
 ----------------------------------------------------------
 Id: 4590e9e8d239303663aba2b1dd2ee98186e716fb9653769e629e138547146385
 Prev: NULL
 Author: alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
-Date: 58 minutes ago
-Date proof (ots): AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIRZDp6NI5MDZjq6Kx3S7pgYbnFvuWU3aeYp4ThUcUY4XwEK07NTp4lG8YdS1OxPC7BqcI8SBkr8mpkM5SFlNjkJN62lnrsUgH5JQbeV1ElflW6TcfOwjxBGO0cffwCC+6rZN0rb4LAIPf4w0u+QyOLi1odHRwczovL2FsaWNlLmJ0Yy5jYWxlbmRhci5vcGVudGltZXN0YW1wcy5vcmc=
+Date: 3 hours ago (✓)
 Type: Text Note
 
   Hi l1
 ----------------------------------------------------------
-
 			|
 			v
 ----------------------------------------------------------
 Id: c814d931e97feb00ee4d2e02202e8c10eda3c1079a427db248aea19d66761e74
 Prev: 4590e9e8d239303663aba2b1dd2ee98186e716fb9653769e629e138547146385
 Author: alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
-Date: 57 minutes ago
-Date proof (ots): AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIyBTZMel/6wDuTS4CIC6MEO2jwQeaQn2ySK6hnWZ2HnTwEIrWuKgf5PZZzeDlBrLu9bsI8SBdRwQUEoJN2MqONATTE368muQCEZD2ZHYNgFbSxwXOgAjwIBpOs2fu7RGS6gov1BZDLT5ANzxGIgZGzkMlKgJ/175RCPEEY7RyKvAIvilgeEA2EcYAg9/jDS75DI4uLWh0dHBzOi8vYWxpY2UuYnRjLmNhbGVuZGFyLm9wZW50aW1lc3RhbXBzLm9yZw==
+Date: 3 hours ago (✓)
 Type: Text Note
 
   Hi l2
 ----------------------------------------------------------
-
 			|
 			v
 ----------------------------------------------------------
 Id: dd4803da9aa55645ebba1b0370759b003c867876271af2a1388f8d6651907285
 Prev: c814d931e97feb00ee4d2e02202e8c10eda3c1079a427db248aea19d66761e74
 Author: alice (cf2053391f2f75ed272aa8ccf2f91545217e6bf9d3c7ce5705114deae0a37d58)
-Date: 10 minutes ago
-Date proof (ots): AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEI3UgD2pqlVkXruhsDcHWbADyGeHYnGvKhOI+NZlGQcoXwEKFgz911FDX8E/VclS4hEL0I8CC8tkFsy08gJVWKzGL4UManRAG0EdWlJD0ikjQgTTM8EAjxBGO0fWbwCBocxJ74fWeLAIPf4w0u+QyOLi1odHRwczovL2FsaWNlLmJ0Yy5jYWxlbmRhci5vcGVudGltZXN0YW1wcy5vcmc=
+Date: 3 hours ago (✓)
 Type: Text Note
 
   Hi l3

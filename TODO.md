@@ -1,5 +1,6 @@
 # TODO
 
+- add relay pooling
 - encrypt private keys and ask for a password for `append, follow, unfollow` actions
 - potentially encrypt all the streams requiring a password for any action
 - make stream.go functions use the storage backend interface type

@@ -284,18 +284,28 @@ func (db *LocalDB) ListEventStreams(include_followed bool) error {
 }
 
 func (db *LocalDB) AddRelay(url string) {
-	db.config.Relays[url] = Policy{
-		Read:  true,
-		Write: true,
-	}
+	db.config.Relays = append(db.config.Relays, url)
 	fmt.Printf("Added relay %s.\n", url)
 	db.SaveConfig()
 }
 
 func (db *LocalDB) RemoveRelay(url string) {
-	delete(config.Relays, url)
-	fmt.Printf("Removed relay %s.\n", url)
-	db.SaveConfig()
+	result := []string{}
+	found := false
+	for _, relay_url := range db.config.Relays {
+		if relay_url != url {
+			result = append(result, relay_url)
+		} else {
+			found = true
+		}
+	}
+	if !found {
+		fmt.Printf("Could not find relay %s\n", url)
+	} else {
+		fmt.Printf("Removed relay %s.\n", url)
+		db.config.Relays = result
+		db.SaveConfig()
+	}
 }
 
 func (db *LocalDB) ListRelays() {

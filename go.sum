@@ -69,8 +69,6 @@ github.com/jrick/logrotate v1.0.0/go.mod h1:LNinyqDIJnpAur+b8yyulnQw/wDuN1+BYKlT
 github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23/go.mod h1:J+Gs4SYgM6CZQHDETBtE9HaSEkGmuNXF86RwHhHUvq4=
 github.com/mitchellh/go-homedir v1.1.0 h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
-github.com/nbd-wtf/go-nostr v0.9.0 h1:6wDsgKUXOtnzHwe/RW80yBebsVNg5jbRyBCTyxlDjiw=
-github.com/nbd-wtf/go-nostr v0.9.0/go.mod h1:qFFTIxh15H5GGN0WsBI/P73DteqsevnhSEW/yk8nEf4=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
@@ -80,10 +78,6 @@ github.com/onsi/gomega v1.4.1/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7JYyY=
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
-github.com/phyro/go-opentimestamps v0.0.0-20221229151518-8aadd4e3fd64 h1:pFk5pwrXK7mnZeVXBlhsekE0tddMaMGI+74sCw7qdqA=
-github.com/phyro/go-opentimestamps v0.0.0-20221229151518-8aadd4e3fd64/go.mod h1:+wdH0yRWPNTb7FBCbgXfuf1hzvbYw2mCMcgUoaoQkTk=
-github.com/phyro/go-opentimestamps v0.0.0-20230101115509-0e126cf6ff1c h1:1kcq5HYsgpWDDChXlh/FOa+mbdq40ZpDb7MKAoYBSPI=
-github.com/phyro/go-opentimestamps v0.0.0-20230101115509-0e126cf6ff1c/go.mod h1:+wdH0yRWPNTb7FBCbgXfuf1hzvbYw2mCMcgUoaoQkTk=
 github.com/phyro/go-opentimestamps v0.0.0-20230101120941-6d27e3979bc9 h1:dauxHVodcxfERwA9EKayllsQZarMi9UmUwH2s0AkMHo=
 github.com/phyro/go-opentimestamps v0.0.0-20230101120941-6d27e3979bc9/go.mod h1:+wdH0yRWPNTb7FBCbgXfuf1hzvbYw2mCMcgUoaoQkTk=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

@@ -15,15 +15,16 @@ func world(db *LocalDB, n Nostr, event_streams []EventStream, verbose bool, rpcc
 	// Before listening, we have to sync all event streams to their HEAD
 	sync_all(n, event_streams, rpcclient)
 
-	pool := n.ReadPool()
+	// pool := n.ReadPool()
 
 	var keys []string
 	for _, es := range event_streams {
 		keys = append(keys, es.PubKey)
 	}
 
-	_, all := pool.Sub(nostr.Filters{{Authors: keys}})
-	for event := range nostr.Unique(all) {
+	// _, all := r.Sub(nostr.Filters{{Authors: keys}})
+	filter := nostr.Filter{Authors: keys}
+	for _, event := range n.SingleQuery(filter) {
 		handle_event(db, event, rpcclient)
 	}
 }

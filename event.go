@@ -21,11 +21,13 @@ var kindNames = map[int]string{
 }
 
 func findEvent(db *LocalDB, n Nostr, id string) *nostr.Event {
-	pool := n.ReadPool()
+	// pool := n.ReadPool()
 
-	_, all := pool.Sub(nostr.Filters{{IDs: []string{id}}})
+	// _, all := pool.Sub(nostr.Filters{{IDs: []string{id}}})
 	fmt.Printf("\nSearching event id: %s", id)
-	for event := range nostr.Unique(all) {
+
+	for _, event := range n.SingleQuery(nostr.Filter{IDs: []string{id}}) {
+		// for event := range nostr.Unique(all) {
 		fmt.Printf("\nFound event id: %s", id)
 		if event.ID != id {
 			log.Printf("got unexpected event %s.\n", event.ID)
@@ -38,7 +40,7 @@ func findEvent(db *LocalDB, n Nostr, id string) *nostr.Event {
 
 // Add event to my stream. In case there were no previous events on the Stream, make a genesis event.
 func publishEvent(n Nostr, ev *nostr.Event) error {
-	pool := n.ReadPool()
+	// pool := n.ReadPool()
 
 	// TMP
 	// ev2 := nostr.Event{
@@ -53,30 +55,12 @@ func publishEvent(n Nostr, ev *nostr.Event) error {
 	fmt.Println(ev.GetExtra("ots"))
 	// FIX: the problem is likely here https://github.com/nbd-wtf/go-nostr/blob/master/event_aux.go#L72-L74
 
-	event, statuses, err := pool.PublishEvent(ev)
-	if err != nil {
-		return fmt.Errorf("error publishing: %s", err.Error())
+	status := n.PublishEvent(*ev)
+	if status != 1 {
+		return fmt.Errorf("error publishing event. Status: %s", status)
 	}
 
-	printPublishStatus(event, statuses, len(n.Relays))
 	return nil
-}
-
-func printPublishStatus(event *nostr.Event, statuses chan nostr.PublishStatus, remaining int) {
-	for status := range statuses {
-		switch status.Status {
-		case nostr.PublishStatusSent:
-			fmt.Printf("Sent event %s to '%s'.\n", event.ID, status.Relay)
-		case nostr.PublishStatusFailed:
-			fmt.Printf("Failed to send event %s to '%s'.\n", event.ID, status.Relay)
-		case nostr.PublishStatusSucceeded:
-			fmt.Printf("Seen %s on '%s'.\n", event.ID, status.Relay)
-		}
-		remaining -= 1
-		if remaining == 0 {
-			return
-		}
-	}
 }
 
 func publishStream(n Nostr, es EventStream) error {
@@ -93,61 +77,84 @@ func publishStream(n Nostr, es EventStream) error {
 	return nil
 }
 
-// Find the next event in the hashchain (Verified sig check included)
+// Find the next event in the hashchain
 func findNextEvents(n Nostr, pubkey string, prev string) ([]*nostr.Event, error) {
 	fmt.Printf("\nSearching for an event with pubkey: %s and prev: %s\n", pubkey, prev)
-	pool := n.ReadPool()
+	// pool := n.ReadPool()
 	// TODO: Smarter filter (created_at filter?)
-	_, events := pool.Sub(nostr.Filters{{Authors: []string{pubkey}}})
-
-	// fix this mess
-	events_chan := nostr.Unique(events)
-	out := false
-
-	go func() {
-		time.Sleep(2 * time.Second)
-		out = true
-	}()
+	// _, events := r.Subscribe(context.Background(), nostr.Filters{{Authors: []string{pubkey}}})
 
 	result := []*nostr.Event{}
 	// Mapping from prev value to event struct. Used to construct the sequence that we return
 	prev_to_event := map[string]nostr.Event{}
 
-	for {
-		if out {
-			// Construct a chain of events
-			for {
-				ev, ok := prev_to_event[prev]
-				if !ok {
-					return result, nil
-				}
-				result = append(result, &ev)
-				prev = ev.ID
+	for _, event := range n.SingleQuery(nostr.Filter{Authors: []string{pubkey}}) {
+		for _, tag := range event.Tags {
+			val, exists := prev_to_event[tag.Value()]
+			if exists {
+				fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", val.ID, event.ID)
+				return nil, errors.New("Conflict")
 			}
-		}
-		select {
-		case event := <-events_chan:
-			for _, tag := range event.Tags {
-				if tag.Key() == "prev" {
-					fmt.Printf("\nGot event, ots: %s", event.GetExtraString("ots"))
-					ok, err := event.CheckSignature()
-					// both 'ok' needs to be true and err nil for a valid sig
-					if ok && err == nil {
-						val, exists := prev_to_event[tag.Value()]
-						if exists {
-							fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", val.ID, event.ID)
-							return nil, errors.New("Conflict")
-						}
-						prev_to_event[tag.Value()] = event
-					} else {
-						// We ignore events with invalid signature
-						fmt.Printf("\nFound an event with an invalid signature. Event id: %s", event.ID)
-					}
-				}
-			}
-		default:
+			prev_to_event[tag.Value()] = event
 		}
 	}
+
+	// Construct a chain of events
+	for {
+		ev, ok := prev_to_event[prev]
+		if !ok {
+			return result, nil
+		}
+		result = append(result, &ev)
+		prev = ev.ID
+	}
+
+	return result, nil
+
+	// fix this mess
+	// events_chan := nostr.Unique(events)
+	// out := false
+
+	// go func() {
+	// 	time.Sleep(2 * time.Second)
+	// 	out = true
+	// }()
+
+	// for {
+	// 	if out {
+	// 		// Construct a chain of events
+	// 		for {
+	// 			ev, ok := prev_to_event[prev]
+	// 			if !ok {
+	// 				return result, nil
+	// 			}
+	// 			result = append(result, &ev)
+	// 			prev = ev.ID
+	// 		}
+	// 	}
+	// 	select {
+	// 	case event := <-events_chan:
+	// 		for _, tag := range event.Tags {
+	// 			if tag.Key() == "prev" {
+	// 				fmt.Printf("\nGot event, ots: %s", event.GetExtraString("ots"))
+	// 				ok, err := event.CheckSignature()
+	// 				// both 'ok' needs to be true and err nil for a valid sig
+	// 				if ok && err == nil {
+	// 					val, exists := prev_to_event[tag.Value()]
+	// 					if exists {
+	// 						fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", val.ID, event.ID)
+	// 						return nil, errors.New("Conflict")
+	// 					}
+	// 					prev_to_event[tag.Value()] = event
+	// 				} else {
+	// 					// We ignore events with invalid signature
+	// 					fmt.Printf("\nFound an event with an invalid signature. Event id: %s", event.ID)
+	// 				}
+	// 			}
+	// 		}
+	// 	default:
+	// 	}
+	// }
 }
 
 func printEvent(evt nostr.Event, name *string, verbose bool) {

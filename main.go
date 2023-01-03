@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/docopt/docopt-go"
-	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 const USAGE = `es
@@ -34,6 +33,8 @@ Usage:
   es relay
   es relay add <url>
   es relay remove <url>
+
+All pubkeys passed should *NOT* be bech32 encoded.
 `
 
 // Fails if we have no active event stream (required for appending etc.)
@@ -49,7 +50,7 @@ func main() {
 
 	db := LocalDB{}
 	db.Init()
-	nostr := Nostr{Relays: db.config.Relays}
+	n := NewNostr(db.config.Relays)
 
 	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
@@ -66,7 +67,7 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		world(&db, nostr, all_es, verbose, db.config.BTCRPC)
+		world(&db, n, all_es, verbose, db.config.BTCRPC)
 
 	// Event stream auth
 	case opts["create"].(bool):
@@ -104,7 +105,7 @@ func main() {
 			log.Println("provided event ID was empty")
 			return
 		}
-		ev := findEvent(&db, nostr, id)
+		ev := findEvent(&db, n, id)
 		// Check if we have a name for the event stream owner
 		var name *string
 		es, err := db.GetEventStream(ev.PubKey)
@@ -122,15 +123,15 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		err = publishEvent(nostr, ev)
+		err = publishEvent(n, ev)
 		if err != nil {
 			log.Panic(err.Error())
 		}
 		db.SaveEventStream(es_active)
 	case opts["follow"].(bool):
-		pubkey := nip19.TranslatePublicKey(opts["<pubkey>"].(string))
+		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
-		err := db.FollowEventStream(nostr, pubkey, name, db.config.BTCRPC)
+		err := db.FollowEventStream(n, pubkey, name, db.config.BTCRPC)
 		if err != nil {
 			log.Panic(err.Error())
 		} else {
@@ -147,7 +148,7 @@ func main() {
 			pubkey, _ := db.GetPubForName(val.(string))
 			es, _ = db.GetEventStream(pubkey)
 		}
-		err := es.Sync(nostr, db.config.BTCRPC)
+		err := es.Sync(n, db.config.BTCRPC)
 		// We save first as we might have added a few new valid events before error
 		db.SaveEventStream(es)
 		if err != nil {
@@ -162,7 +163,7 @@ func main() {
 			log.Panic(err.Error())
 		}
 		fmt.Printf("Pushing stream labeled as %s\n", name)
-		err = publishStream(nostr, es)
+		err = publishStream(n, es)
 		if err != nil {
 			log.Panic(err.Error())
 		}

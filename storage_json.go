@@ -13,50 +13,60 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-const BASE_DIR = "~/.config/nostr"
-const CONFIG_FILE = "config.json"
-
-var db LocalDB
+const STREAM_BASE_DIR = "~/.config/nostr/streams"
+const STATE_FILE = "state.json"
 
 // Very simple json storage
 type LocalDB struct {
-	config Config
+	state State
 }
 
-func (db *LocalDB) Init() {
-	// Make config folder
-	base_dir_exp, _ := homedir.Expand(BASE_DIR)
+// Handles which event stream is active
+type State struct {
+	Active string `json:"active"`
+}
+
+func (s *State) Load() {
+	base_dir_exp, _ := homedir.Expand(STREAM_BASE_DIR)
 	os.Mkdir(base_dir_exp, 0700)
-	path := filepath.Join(base_dir_exp, CONFIG_FILE)
+	path := filepath.Join(base_dir_exp, STATE_FILE)
 	_, err := os.Open(path)
 	if err != nil {
 		// File doesn't exist, create it
-		db.config = Config{DataDir: base_dir_exp}
-		db.SaveConfig()
+		s = &State{Active: ""}
+		s.Save()
 		_, _ = os.Open(path)
 	}
 	f, _ := os.Open(path)
-	err = json.NewDecoder(f).Decode(&db.config)
+	err = json.NewDecoder(f).Decode(s)
 	if err != nil {
-		log.Fatal("can't parse config file " + path + ": " + err.Error())
+		log.Fatal("can't parse state file " + path + ": " + err.Error())
 	}
-	db.config.Init()
 }
 
-func (db *LocalDB) SaveConfig() {
-	path := filepath.Join(db.config.DataDir, CONFIG_FILE)
+func (s *State) Save() {
+	base_dir_exp, _ := homedir.Expand(STREAM_BASE_DIR)
+	path := filepath.Join(base_dir_exp, STATE_FILE)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatal("can't open config file " + path + ": " + err.Error())
+		log.Fatal("can't open state file " + path + ": " + err.Error())
 		return
 	}
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	enc.Encode(db.config)
+	enc.Encode(*s)
 }
 
-/// StorageBackend interface implementation
+func (s *State) GetActive() string {
+	return s.Active
+}
+
+func (s *State) SetActive(active string) {
+	s.Active = active
+}
+
+/// StreamStore interface implementation
 
 // Create a new event stream (or use an existing one)
 func (db *LocalDB) CreateEventStream(name string, priv_key string, generate bool) {
@@ -99,8 +109,8 @@ func (db *LocalDB) RemoveEventStream(name string) {
 	is_active := es_active.PubKey == es.PubKey
 	// If deleted user was active, set nobody to active
 	if is_active {
-		db.config.Active = ""
-		db.SaveConfig()
+		db.state.SetActive("")
+		db.state.Save()
 	}
 	// Delete stream file
 	path := pathForPubKey("stream", pubkey)
@@ -115,17 +125,17 @@ func (db *LocalDB) SetActiveEventStream(name string) error {
 	if err != nil {
 		return err
 	}
-	db.config.Active = pubkey
-	db.SaveConfig()
+	db.state.SetActive(pubkey)
+	db.state.Save()
 
 	return nil
 }
 
 // Get the active account
 func (db *LocalDB) GetActiveStream() (*EventStream, error) {
-	pubkey := db.config.Active
+	pubkey := db.state.GetActive()
 	if pubkey == "" {
-		return nil, errors.New("No active stream set.")
+		return nil, errors.New("no active stream set")
 	}
 	return db.GetEventStream(pubkey)
 }
@@ -146,7 +156,7 @@ func (db *LocalDB) GetEventStream(pubkey string) (*EventStream, error) {
 
 // Get all event streams stored locally
 func (db *LocalDB) GetAllEventStreams() ([]*EventStream, error) {
-	base_path, _ := homedir.Expand(BASE_DIR)
+	base_path, _ := homedir.Expand(STREAM_BASE_DIR)
 	var result []*EventStream
 	filepath.Walk(base_path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -154,7 +164,7 @@ func (db *LocalDB) GetAllEventStreams() ([]*EventStream, error) {
 		}
 		splt := strings.Split(info.Name(), ".")
 		ext := splt[len(splt)-1]
-		if info.Name() == "nostr" || info.Name() == CONFIG_FILE || ext == "ots" {
+		if info.Name() == "streams" || info.Name() == STATE_FILE || ext == "ots" {
 			return nil
 		}
 
@@ -173,7 +183,7 @@ func (db *LocalDB) SaveEventStream(es *EventStream) error {
 	path := pathForPubKey("stream", es.PubKey)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatal("can't open config file " + path + ": " + err.Error())
+		log.Fatal("can't open stream file " + path + ": " + err.Error())
 		return err
 	}
 
@@ -246,64 +256,6 @@ func (db *LocalDB) ListEventStreams(include_followed bool) error {
 	return nil
 }
 
-func (db *LocalDB) AddRelay(url string) {
-	db.config.Relays = append(db.config.Relays, url)
-	fmt.Printf("Added relay %s.\n", url)
-	db.SaveConfig()
-}
-
-func (db *LocalDB) RemoveRelay(url string) {
-	result := []string{}
-	found := false
-	for _, relay_url := range db.config.Relays {
-		if relay_url != url {
-			result = append(result, relay_url)
-		} else {
-			found = true
-		}
-	}
-	if !found {
-		fmt.Printf("Could not find relay %s\n", url)
-	} else {
-		fmt.Printf("Removed relay %s.\n", url)
-		db.config.Relays = result
-		db.SaveConfig()
-	}
-}
-
-func (db *LocalDB) ListRelays() []string {
-	return db.config.Relays
-}
-
-func (db *LocalDB) GetBitcoinRPC() *BTCRPCClient {
-	return db.config.BTCRPC
-}
-
-func (db *LocalDB) ConfigureBitcoinRPC(host string, user string, password string) error {
-	db.config.BTCRPC = &BTCRPCClient{
-		Host:     host,
-		User:     user,
-		Password: password,
-	}
-	client, err := newBtcConn(host, user, password)
-	if err != nil {
-		return err
-	}
-	ver, err := client.BackendVersion()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Bitcoin node version: %d\n", ver)
-	db.SaveConfig()
-
-	return nil
-}
-
-func (db *LocalDB) UnsetBitcoinRPC() {
-	db.config.BTCRPC = nil
-	db.SaveConfig()
-}
-
 // Returns two lists: owned and followed events streams
 func (db *LocalDB) GetOwnedFollowedESS() ([]*EventStream, []*EventStream) {
 	ess, err := db.GetAllEventStreams()
@@ -348,7 +300,7 @@ func (db *LocalDB) GetPubForName(name string) (string, error) {
 
 // Given a context (i.e. "account", "stream") returns path to file
 func pathForPubKey(ctx string, pubkey string) string {
-	base_path, _ := homedir.Expand(BASE_DIR)
+	base_path, _ := homedir.Expand(STREAM_BASE_DIR)
 	path := filepath.Join(base_path, pubkey) + "." + ctx + ".json"
 	return path
 }

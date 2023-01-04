@@ -3,8 +3,6 @@
 - add per stream relay pooling
 - encrypt private keys and ask for a password for `append, follow, unfollow` actions
 - potentially encrypt all the streams requiring a password for any action
-- make stream.go functions use the storage backend interface type
-- rename stream.go to core.go because syncing/appending/following event streams is the core functionality
 - load identity map (pubkey -> name) and use `<name> (<pubkey>)` throughout the app
 - test properties with multipass + multiple relays
 - bubbletea TUI

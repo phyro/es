@@ -33,7 +33,7 @@ func (es *EventStream) Create(content string, rpcclient *BTCRPCClient) (*nostr.E
 	prev := es.GetHead()
 	tags := nostr.Tags{nostr.Tag{"prev", prev}}
 
-	event := nostr.Event{
+	event := &nostr.Event{
 		CreatedAt: time.Now(),
 		Kind:      nostr.KindTextNote,
 		Tags:      tags,
@@ -48,17 +48,17 @@ func (es *EventStream) Create(content string, rpcclient *BTCRPCClient) (*nostr.E
 	}
 
 	// Stamp with ots
-	ots_content := stamp(&event)
+	ots_content := stamp(event)
 	ots_b64 := b64.StdEncoding.EncodeToString([]byte(ots_content))
 	event.SetExtra("ots", ots_b64)
 
 	// We append the event as soon as it is created. This verifies all the event stream properties are present
-	err = es.Append(event, rpcclient)
+	err = es.Append(*event, rpcclient)
 	if err != nil {
 		return nil, err
 	}
 
-	return &event, nil
+	return event, nil
 }
 
 func (es *EventStream) Append(ev nostr.Event, rpcclient *BTCRPCClient) error {

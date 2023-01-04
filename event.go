@@ -20,7 +20,7 @@ var kindNames = map[int]string{
 	nostr.KindDeletion:               "Deletion Notice",
 }
 
-func findEvent(db StorageBackend, n *Nostr, id string) (*nostr.Event, error) {
+func findEvent(n *Nostr, id string) (*nostr.Event, error) {
 	fmt.Printf("\nSearching event id: %s", id)
 	for _, event := range n.SingleQuery(nostr.Filter{IDs: []string{id}}) {
 		if event.ID != id {

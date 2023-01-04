@@ -1,36 +1,54 @@
 package main
 
-// A backend interface for saving/reading streams & relays
-type StorageBackend interface {
-	// Event stream management
-	CreateEventStream(string, string, bool)
-	RemoveEventStream(string)
-	SetActiveEventStream(string) error
-	GetActiveStream() (*EventStream, error)
+type StreamService struct {
+	store  StreamStore
+	config *Config
+}
 
-	// Core
+func (s *StreamService) Load() {
+	cfg := Config{}
+	cfg.Load()
+	store := LocalDB{}
+	store.state.Load()
+
+	s.store = &store
+	s.config = &cfg
+}
+
+// A StreamStore provides an interface for managing EventStreams including timestamping
+type StreamStore interface {
+	StreamStoreReader
+	StreamStoreWriter
+}
+
+// Handling all read operations on stream store
+type StreamStoreReader interface {
+	GetActiveStream() (*EventStream, error)
 	GetEventStream(string) (*EventStream, error)
 	GetAllEventStreams() ([]*EventStream, error)
-	SaveEventStream(*EventStream) error
-	FollowEventStream(*Nostr, string, string, *BTCRPCClient) error
-	UnfollowEventStream(string)
-
 	// Misc
 	ListEventStreams(bool) error
 	GetPubForName(string) (string, error)
+}
 
-	// Relay
+// Handling all write operations on stream store
+type StreamStoreWriter interface {
+	CreateEventStream(string, string, bool)
+	SaveEventStream(*EventStream) error
+	RemoveEventStream(string)
+	SetActiveEventStream(string) error
+	FollowEventStream(*Nostr, string, string, *BTCRPCClient) error
+	UnfollowEventStream(string)
+}
+
+type Relayer interface {
 	AddRelay(string)
 	RemoveRelay(string)
 	ListRelays() []string
+}
 
-	// OTS RPC
+type OTSHandler interface {
 	GetBitcoinRPC() *BTCRPCClient
 	ConfigureBitcoinRPC(string, string, string) error
 	UnsetBitcoinRPC()
-}
-
-// Identity for type checking atm
-func NewStreamStore(s StorageBackend) StorageBackend {
-	return s
 }

@@ -47,7 +47,7 @@ func stamp(ev *nostr.Event) string {
 	}
 	digest_32 := sha256.Sum256(ev.Serialize())
 	digest := digest_32[:]
-	base_path, _ := homedir.Expand(BASE_DIR)
+	base_path, _ := homedir.Expand(CONFIG_BASE_DIR)
 	// We will save the .ots in <event_id>.ots
 	path := filepath.Join(base_path, ev.ID)
 	outFile, err := os.Create(path + ".ots")

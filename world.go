@@ -12,14 +12,14 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-func world(db StorageBackend, n *Nostr, event_streams []*EventStream, verbose bool) {
+func world(srv *StreamService, n *Nostr, event_streams []*EventStream, verbose bool) {
 	if len(event_streams) == 0 {
 		log.Println("You need to be following at least one stream to run 'world'")
 		return
 	}
 	// Before listening, we have to sync all event streams to their HEAD
-	rpcclient := db.GetBitcoinRPC()
-	sync_all(n, event_streams, rpcclient)
+	rpcclient := srv.config.GetBitcoinRPC()
+	sync_all(srv.store, n, event_streams, rpcclient)
 	var keys []string
 	for _, es := range event_streams {
 		keys = append(keys, es.PubKey)
@@ -38,7 +38,7 @@ L:
 	for {
 		select {
 		case ev := <-evt_chan:
-			handle_event(db, ev, rpcclient)
+			handle_event(srv.store, ev, rpcclient)
 		case sig := <-cancel_chan:
 			fmt.Println(sig)
 			// Shutdown threads
@@ -53,18 +53,18 @@ L:
 	fmt.Println("\nBye world.")
 }
 
-func sync_all(n *Nostr, ess []*EventStream, rpcclient *BTCRPCClient) {
+func sync_all(store StreamStore, n *Nostr, ess []*EventStream, rpcclient *BTCRPCClient) {
 	fmt.Println("Syncing event streams. This may take a while...")
 	for _, es := range ess {
 		es.Sync(n, rpcclient)
-		db.SaveEventStream(es)
+		store.SaveEventStream(es)
 	}
 	fmt.Println("\nEvent streams synced.")
 }
 
-func handle_event(db StorageBackend, ev nostr.Event, rpcclient *BTCRPCClient) {
+func handle_event(store StreamStore, ev nostr.Event, rpcclient *BTCRPCClient) {
 	// Find the expected head of the event stream
-	es, err := db.GetEventStream(ev.PubKey)
+	es, err := store.GetEventStream(ev.PubKey)
 	if err != nil {
 		log.Panic(err.Error())
 	}
@@ -78,7 +78,7 @@ func handle_event(db StorageBackend, ev nostr.Event, rpcclient *BTCRPCClient) {
 
 	// Append event to the event stream chain
 	es.Append(ev, rpcclient)
-	db.SaveEventStream(es)
+	store.SaveEventStream(es)
 
 	printEvent(ev, &es.Name, true)
 }

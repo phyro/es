@@ -38,8 +38,8 @@ All pubkeys passed should *NOT* be bech32 encoded.
 `
 
 // Fails if we have no active event stream (required for appending etc.)
-func require_active(db StorageBackend) {
-	_, err := db.GetActiveStream()
+func require_active(store StreamStore) {
+	_, err := store.GetActiveStream()
 	if err != nil {
 		log.Panic(err.Error())
 	}
@@ -49,10 +49,9 @@ func main() {
 	flag.Parse()
 	log.SetPrefix("<> ")
 
-	json_db := LocalDB{}
-	json_db.Init()
-	db := NewStreamStore(&json_db)
-	n := NewNostr(db.ListRelays())
+	srv := &StreamService{}
+	srv.Load()
+	n := NewNostr(srv.config.ListRelays())
 
 	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
@@ -65,11 +64,11 @@ func main() {
 	// View the event stream world
 	case opts["world"].(bool):
 		verbose, _ := opts.Bool("--verbose")
-		all_es, err := db.GetAllEventStreams()
+		all_es, err := srv.store.GetAllEventStreams()
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		world(db, &n, all_es, verbose)
+		world(srv, &n, all_es, verbose)
 
 	// Event stream auth
 	case opts["create"].(bool):
@@ -77,28 +76,28 @@ func main() {
 		name := opts["<name>"].(string)
 		priv_key, _ := opts.String("<privkey>")
 		generate, _ := opts.Bool("--gen")
-		db.CreateEventStream(name, priv_key, generate)
+		srv.store.CreateEventStream(name, priv_key, generate)
 	case opts["remove"].(bool):
 		name := opts["<name>"].(string)
-		db.RemoveEventStream(name)
+		srv.store.RemoveEventStream(name)
 		fmt.Printf("Removed %s stream.", name)
 	case opts["switch"].(bool):
 		name := opts["<name>"].(string)
-		db.SetActiveEventStream(name)
+		srv.store.SetActiveEventStream(name)
 	case opts["ll"].(bool):
-		require_active(db)
+		require_active(srv.store)
 		all, _ := opts.Bool("-a")
-		db.ListEventStreams(all)
+		srv.store.ListEventStreams(all)
 
 	// View
 	case opts["log"].(bool):
-		require_active(db)
-		es_active, _ := db.GetActiveStream()
+		require_active(srv.store)
+		es_active, _ := srv.store.GetActiveStream()
 		pubkey := es_active.PubKey
 		if val, _ := opts["--name"]; val != nil {
-			pubkey, _ = db.GetPubForName(val.(string))
+			pubkey, _ = srv.store.GetPubForName(val.(string))
 		}
-		es, _ := db.GetEventStream(pubkey)
+		es, _ := srv.store.GetEventStream(pubkey)
 		es.Print(true)
 	case opts["show"].(bool):
 		verbose, _ := opts.Bool("--verbose")
@@ -107,14 +106,14 @@ func main() {
 			log.Println("provided event ID was empty")
 			return
 		}
-		ev, err := findEvent(db, &n, id)
+		ev, err := findEvent(&n, id)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 		// Check if we have a name for the event stream owner
 		var name *string
-		es, err := db.GetEventStream(ev.PubKey)
+		es, err := srv.store.GetEventStream(ev.PubKey)
 		if err == nil {
 			name = &es.Name
 		}
@@ -122,10 +121,10 @@ func main() {
 
 	// Core
 	case opts["append"].(bool):
-		require_active(db)
-		es_active, _ := db.GetActiveStream()
+		require_active(srv.store)
+		es_active, _ := srv.store.GetActiveStream()
 		content := opts["<content>"].(string)
-		ev, err := es_active.Create(content, db.GetBitcoinRPC())
+		ev, err := es_active.Create(content, srv.config.GetBitcoinRPC())
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -133,12 +132,12 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		db.SaveEventStream(es_active)
+		srv.store.SaveEventStream(es_active)
 		fmt.Println("Added event:", ev.ID)
 	case opts["follow"].(bool):
 		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
-		err := db.FollowEventStream(&n, pubkey, name, db.GetBitcoinRPC())
+		err := srv.store.FollowEventStream(&n, pubkey, name, srv.config.GetBitcoinRPC())
 		if err != nil {
 			log.Panic(err.Error())
 		} else {
@@ -146,26 +145,26 @@ func main() {
 		}
 	case opts["unfollow"].(bool):
 		name := opts["<name>"].(string)
-		db.UnfollowEventStream(name)
+		srv.store.UnfollowEventStream(name)
 		fmt.Printf("Removed %s stream.", name)
 	case opts["sync"].(bool):
-		require_active(db)
-		es, _ := db.GetActiveStream()
+		require_active(srv.store)
+		es, _ := srv.store.GetActiveStream()
 		if val, _ := opts["<name>"]; val != nil {
-			pubkey, _ := db.GetPubForName(val.(string))
-			es, _ = db.GetEventStream(pubkey)
+			pubkey, _ := srv.store.GetPubForName(val.(string))
+			es, _ = srv.store.GetEventStream(pubkey)
 		}
-		err := es.Sync(&n, db.GetBitcoinRPC())
+		err := es.Sync(&n, srv.config.GetBitcoinRPC())
 		// We save first as we might have added a few new valid events before error
-		db.SaveEventStream(es)
+		srv.store.SaveEventStream(es)
 		if err != nil {
 			log.Panic(err.Error())
 		}
 
 	case opts["push"].(bool):
 		name := opts["<name>"].(string)
-		pubkey, _ := db.GetPubForName(name)
-		es, err := db.GetEventStream(pubkey)
+		pubkey, _ := srv.store.GetPubForName(name)
+		es, err := srv.store.GetEventStream(pubkey)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -181,12 +180,12 @@ func main() {
 		switch {
 		case opts["upgrade"].(bool):
 			name := opts["<name>"].(string)
-			pubkey, err := db.GetPubForName(name)
+			pubkey, err := srv.store.GetPubForName(name)
 			if err != nil {
 				log.Println(err.Error())
 				return
 			}
-			es, err := db.GetEventStream(pubkey)
+			es, err := srv.store.GetEventStream(pubkey)
 			if err != nil {
 				log.Println(err.Error())
 				return
@@ -195,32 +194,32 @@ func main() {
 			if err != nil {
 				log.Println(err.Error())
 			}
-			db.SaveEventStream(es)
+			srv.store.SaveEventStream(es)
 		case opts["verify"].(bool):
 			name := opts["<name>"].(string)
-			pubkey, err := db.GetPubForName(name)
+			pubkey, err := srv.store.GetPubForName(name)
 			if err != nil {
 				log.Println(err.Error())
 				return
 			}
-			es, err := db.GetEventStream(pubkey)
+			es, err := srv.store.GetEventStream(pubkey)
 			if err != nil {
 				log.Println(err.Error())
 				return
 			}
-			es.OTSVerify(db.GetBitcoinRPC())
+			es.OTSVerify(srv.config.GetBitcoinRPC())
 		case opts["rpc"].(bool):
 			host := opts["<url>"].(string)
 			user := opts["<user>"].(string)
 			password := opts["<password>"].(string)
-			err := db.ConfigureBitcoinRPC(host, user, password)
+			err := srv.config.ConfigureBitcoinRPC(host, user, password)
 			if err != nil {
 				log.Printf("\nCould not connect, keeping old rpc settings. Error: %s", err.Error())
 				return
 			}
 			fmt.Println("Successfully configured Bitcoin RPC.")
 		case opts["norpc"].(bool):
-			db.UnsetBitcoinRPC()
+			srv.config.UnsetBitcoinRPC()
 		}
 
 	// Relay
@@ -228,12 +227,12 @@ func main() {
 		switch {
 		case opts["add"].(bool):
 			url := opts["<url>"].(string)
-			db.AddRelay(url)
+			srv.config.AddRelay(url)
 		case opts["remove"].(bool):
 			url := opts["<url>"].(string)
-			db.RemoveRelay(url)
+			srv.config.RemoveRelay(url)
 		default:
-			for _, relay_url := range db.ListRelays() {
+			for _, relay_url := range srv.config.ListRelays() {
 				fmt.Println("Url:", relay_url)
 			}
 		}

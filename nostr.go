@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -37,22 +38,27 @@ func (n *Nostr) SingleQuery(filter nostr.Filter) []nostr.Event {
 	return r.QuerySync(ctx, filter)
 }
 
-func (n *Nostr) Listen(ctx context.Context, evt_chan chan nostr.Event, filter nostr.Filter) {
+func (n *Nostr) Listen(wg *sync.WaitGroup, ctx context.Context, evt_chan chan nostr.Event, filter nostr.Filter) {
 	for _, r := range n.Relays {
 		sub := r.Subscribe(ctx, nostr.Filters{filter})
 		// Initiate subscriptions in go threads and delegate results to event channel
-		go func() {
+		fmt.Printf("\nStarted sub on relay: %s", r.URL)
+		wg.Add(1)
+		go func(relay_url string) {
+			defer wg.Done()
 			for {
 				select {
 				case ev := <-sub.Events:
 					evt_chan <- ev
 				case <-ctx.Done():
 					sub.Unsub()
-					fmt.Println("Closing sub")
+					fmt.Printf("\nClosing sub for relay: %s", relay_url)
+					return
 				}
 			}
-		}()
+		}(r.URL)
 	}
+	fmt.Println()
 }
 
 func (n *Nostr) PublishEvent(ev nostr.Event) nostr.Status {

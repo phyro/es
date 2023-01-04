@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -22,20 +25,32 @@ func world(db StorageBackend, n *Nostr, event_streams []*EventStream, verbose bo
 		keys = append(keys, es.PubKey)
 	}
 
-	// // Find events for the streams we follow
-	ctx := context.Background()
+	// Find events for the streams we follow
+	cancel_chan := make(chan os.Signal, 1)
+	signal.Notify(cancel_chan, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan bool, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+
 	evt_chan := make(chan nostr.Event)
-	n.Listen(ctx, evt_chan, nostr.Filter{Authors: keys})
+	n.Listen(&wg, ctx, evt_chan, nostr.Filter{Authors: keys})
+L:
 	for {
 		select {
 		case ev := <-evt_chan:
 			handle_event(db, ev, rpcclient)
-		case <-ctx.Done():
-			// Let other go threads close (TODO: fix this)
-			time.Sleep(5 * time.Second)
-			return
+		case sig := <-cancel_chan:
+			fmt.Println(sig)
+			// Shutdown threads
+			cancel()
+			done <- true
+			break L
 		}
 	}
+
+	<-done
+	wg.Wait()
+	fmt.Println("\nBye world.")
 }
 
 func sync_all(n *Nostr, ess []*EventStream, rpcclient *BTCRPCClient) {

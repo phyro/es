@@ -201,6 +201,10 @@ func (es *EventStream) ListRelays() []string {
 	return es.Relays
 }
 
+func (es *EventStream) HasRelays() bool {
+	return len(es.Relays) > 0
+}
+
 func (es *EventStream) Print(show_chain bool) {
 	fmt.Printf("%s (%s)\n", es.Name, es.PubKey)
 	if !show_chain {

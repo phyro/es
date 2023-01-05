@@ -17,10 +17,19 @@ func world(srv *StreamService, n *Nostr, event_streams []*EventStream, verbose b
 		log.Println("You need to be following at least one stream to run 'world'")
 		return
 	}
-	// Before listening, we have to sync all event streams to their HEAD
-	sync_all(srv.store, n, srv.ots, event_streams)
-	var keys []string
+
+	// We can't sync or listen if we don't know where
+	ess_filtered := []*EventStream{}
 	for _, es := range event_streams {
+		if es.HasRelays() {
+			ess_filtered = append(ess_filtered, es)
+		}
+	}
+
+	// Before listening, we have to sync all event streams to their HEAD
+	sync_all(srv.store, n, srv.ots, ess_filtered)
+	var keys []string
+	for _, es := range ess_filtered {
 		keys = append(keys, es.PubKey)
 	}
 

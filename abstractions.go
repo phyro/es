@@ -7,30 +7,12 @@ import (
 	"github.com/phyro/go-opentimestamps/opentimestamps"
 )
 
-type StreamService struct {
-	store  StreamStore
-	config *Config
-	ots    *OTSService
-}
-
-func (s *StreamService) Load() {
-	cfg := Config{}
-	cfg.Load()
-	store := LocalDB{}
-	store.state.Load()
-
-	s.store = &store
-	s.config = &cfg
-	s.ots = &OTSService{rpcclient: cfg.GetBitcoinRPC()}
-}
-
-// A StreamStore provides an interface for managing EventStreams including timestamping
+// StreamStore provides an interface for storage and retrieval of EventStreams
 type StreamStore interface {
 	StreamStoreReader
 	StreamStoreWriter
 }
 
-// Handling all read operations on stream store
 type StreamStoreReader interface {
 	GetActiveStream() (*EventStream, error)
 	GetEventStream(string) (*EventStream, error)
@@ -40,7 +22,6 @@ type StreamStoreReader interface {
 	GetPubForName(string) (string, error)
 }
 
-// Handling all write operations on stream store
 type StreamStoreWriter interface {
 	CreateEventStream(string, string, bool)
 	SaveEventStream(*EventStream) error
@@ -50,7 +31,7 @@ type StreamStoreWriter interface {
 	UnfollowEventStream(string)
 }
 
-// An EventStreamer provides an interface for managing event streams
+// EventStreamer provides an interface for managing event streams
 type EventStreamer interface {
 	// Core event stream behaviour
 	Create(string, Timestamper) (*nostr.Event, error)
@@ -63,6 +44,7 @@ type EventStreamer interface {
 	AddRelay(string) error
 	RemoveRelay(string) error
 	ListRelays() []string
+	HasRelays() bool
 
 	Print(bool)
 	// TODO: We can make a correct by construction design by appending only
@@ -70,9 +52,8 @@ type EventStreamer interface {
 	// attest to our event though? We may need a "Verify" on EventStreamer
 }
 
-// Timestamper handles the timestamping of events
+// Timestamper provides an interface for timestamping nostr events
 type Timestamper interface {
-	// Should return a b64 string
 	Stamp(*nostr.Event) (string, error)
 	IsUpgraded(*nostr.Event) bool
 	Upgrade(*nostr.Event) (*opentimestamps.Timestamp, error)

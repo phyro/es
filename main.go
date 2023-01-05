@@ -47,6 +47,13 @@ func require_active(store StreamStore) {
 	}
 }
 
+func require_relays(es *EventStream) {
+	if len(es.ListRelays()) == 0 {
+		log.Println("this event stream has no relays set")
+		os.Exit(1)
+	}
+}
+
 func main() {
 	flag.Parse()
 	log.SetPrefix("<> ")
@@ -110,6 +117,7 @@ func main() {
 		es, _ := srv.store.GetEventStream(pubkey)
 		es.Print(true)
 	case opts["show"].(bool):
+		require_relays(es_active)
 		verbose, _ := opts.Bool("--verbose")
 		id := opts["<id>"].(string)
 		if id == "" {
@@ -131,6 +139,7 @@ func main() {
 
 	// Core
 	case opts["append"].(bool):
+		require_relays(es_active)
 		content := opts["<content>"].(string)
 		ev, err := es_active.Create(content, srv.ots)
 		if err != nil {
@@ -156,6 +165,7 @@ func main() {
 		srv.store.UnfollowEventStream(name)
 		fmt.Printf("Removed %s stream.", name)
 	case opts["sync"].(bool):
+		require_relays(es_active)
 		require_active(srv.store)
 		es, _ := srv.store.GetActiveStream()
 		if val, _ := opts["<name>"]; val != nil {

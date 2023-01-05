@@ -60,17 +60,6 @@ func main() {
 
 	srv := &StreamService{}
 	srv.Load()
-	require_active(srv.store)
-	es_active, err := srv.store.GetActiveStream()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	n, err := NewNostr(es_active.Relays)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
 
 	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
@@ -79,17 +68,8 @@ func main() {
 		return
 	}
 
+	// Event stream auth commands - don't require an active event stream set
 	switch {
-	// View the event stream world
-	case opts["world"].(bool):
-		verbose, _ := opts.Bool("--verbose")
-		all_es, err := srv.store.GetAllEventStreams()
-		if err != nil {
-			log.Panic(err.Error())
-		}
-		world(srv, n, all_es, verbose)
-
-	// Event stream auth
 	case opts["create"].(bool):
 		// TODO: make this read from stdin and encrypt private key in jsons
 		name := opts["<name>"].(string)
@@ -107,9 +87,31 @@ func main() {
 		require_active(srv.store)
 		all, _ := opts.Bool("-a")
 		srv.store.ListEventStreams(all)
+	}
 
+	es_active, err := srv.store.GetActiveStream()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	n, err := NewNostr(es_active.Relays)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	switch {
+	// View the event stream world
+	case opts["world"].(bool):
+		verbose, _ := opts.Bool("--verbose")
+		all_es, err := srv.store.GetAllEventStreams()
+		if err != nil {
+			log.Panic(err.Error())
+		}
+		world(srv, n, all_es, verbose)
 	// View
 	case opts["log"].(bool):
+		require_active(srv.store)
 		pubkey := es_active.PubKey
 		if val, _ := opts["--name"]; val != nil {
 			pubkey, _ = srv.store.GetPubForName(val.(string))
@@ -117,6 +119,7 @@ func main() {
 		es, _ := srv.store.GetEventStream(pubkey)
 		es.Print(true)
 	case opts["show"].(bool):
+		require_active(srv.store)
 		require_relays(es_active)
 		verbose, _ := opts.Bool("--verbose")
 		id := opts["<id>"].(string)
@@ -139,6 +142,7 @@ func main() {
 
 	// Core
 	case opts["append"].(bool):
+		require_active(srv.store)
 		require_relays(es_active)
 		content := opts["<content>"].(string)
 		ev, err := es_active.Create(content, srv.ots)
@@ -152,6 +156,7 @@ func main() {
 		srv.store.SaveEventStream(es_active)
 		fmt.Println("Added event:", ev.ID)
 	case opts["follow"].(bool):
+		require_active(srv.store)
 		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
 		err := srv.store.FollowEventStream(n, srv.ots, pubkey, name)
@@ -161,6 +166,7 @@ func main() {
 			fmt.Println("ok")
 		}
 	case opts["unfollow"].(bool):
+		require_active(srv.store)
 		name := opts["<name>"].(string)
 		srv.store.UnfollowEventStream(name)
 		fmt.Printf("Removed %s stream.", name)
@@ -180,6 +186,7 @@ func main() {
 		}
 
 	case opts["push"].(bool):
+		require_active(srv.store)
 		name := opts["<name>"].(string)
 		pubkey, _ := srv.store.GetPubForName(name)
 		es, err := srv.store.GetEventStream(pubkey)
@@ -195,6 +202,7 @@ func main() {
 
 	// OpenTimestamps
 	case opts["ots"].(bool):
+		require_active(srv.store)
 		switch {
 		case opts["upgrade"].(bool):
 			name := opts["<name>"].(string)
@@ -242,6 +250,7 @@ func main() {
 
 	// Relay
 	case opts["relay"].(bool):
+		require_active(srv.store)
 		switch {
 		case opts["add"].(bool):
 			url := opts["<url>"].(string)

@@ -124,7 +124,7 @@ func main() {
 		require_active(srv.store)
 		es_active, _ := srv.store.GetActiveStream()
 		content := opts["<content>"].(string)
-		ev, err := es_active.Create(content, srv.config.GetBitcoinRPC())
+		ev, err := es_active.Create(content, srv.ots)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -137,7 +137,7 @@ func main() {
 	case opts["follow"].(bool):
 		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
-		err := srv.store.FollowEventStream(&n, pubkey, name, srv.config.GetBitcoinRPC())
+		err := srv.store.FollowEventStream(&n, srv.ots, pubkey, name)
 		if err != nil {
 			log.Panic(err.Error())
 		} else {
@@ -154,7 +154,7 @@ func main() {
 			pubkey, _ := srv.store.GetPubForName(val.(string))
 			es, _ = srv.store.GetEventStream(pubkey)
 		}
-		err := es.Sync(&n, srv.config.GetBitcoinRPC())
+		err := es.Sync(&n, srv.ots)
 		// We save first as we might have added a few new valid events before error
 		srv.store.SaveEventStream(es)
 		if err != nil {
@@ -207,7 +207,7 @@ func main() {
 				log.Println(err.Error())
 				return
 			}
-			es.OTSVerify(srv.config.GetBitcoinRPC())
+			es.OTSVerify(srv.ots)
 		case opts["rpc"].(bool):
 			host := opts["<url>"].(string)
 			user := opts["<user>"].(string)

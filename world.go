@@ -18,8 +18,7 @@ func world(srv *StreamService, n *Nostr, event_streams []*EventStream, verbose b
 		return
 	}
 	// Before listening, we have to sync all event streams to their HEAD
-	rpcclient := srv.config.GetBitcoinRPC()
-	sync_all(srv.store, n, event_streams, rpcclient)
+	sync_all(srv.store, n, srv.ots, event_streams)
 	var keys []string
 	for _, es := range event_streams {
 		keys = append(keys, es.PubKey)
@@ -38,7 +37,7 @@ L:
 	for {
 		select {
 		case ev := <-evt_chan:
-			handle_event(srv.store, ev, rpcclient)
+			handle_event(srv.store, srv.ots, ev)
 		case sig := <-cancel_chan:
 			fmt.Println(sig)
 			// Shutdown threads
@@ -53,16 +52,16 @@ L:
 	fmt.Println("\nBye world.")
 }
 
-func sync_all(store StreamStore, n *Nostr, ess []*EventStream, rpcclient *BTCRPCClient) {
+func sync_all(store StreamStore, n *Nostr, ots Timestamper, ess []*EventStream) {
 	fmt.Println("Syncing event streams. This may take a while...")
 	for _, es := range ess {
-		es.Sync(n, rpcclient)
+		es.Sync(n, ots)
 		store.SaveEventStream(es)
 	}
 	fmt.Println("\nEvent streams synced.")
 }
 
-func handle_event(store StreamStore, ev nostr.Event, rpcclient *BTCRPCClient) {
+func handle_event(store StreamStore, ots Timestamper, ev nostr.Event) {
 	// Find the expected head of the event stream
 	es, err := store.GetEventStream(ev.PubKey)
 	if err != nil {
@@ -77,7 +76,7 @@ func handle_event(store StreamStore, ev nostr.Event, rpcclient *BTCRPCClient) {
 	}
 
 	// Append event to the event stream chain
-	es.Append(ev, rpcclient)
+	es.Append(ev, ots)
 	store.SaveEventStream(es)
 
 	printEvent(ev, &es.Name, true)

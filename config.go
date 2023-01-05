@@ -62,7 +62,7 @@ func (c *Config) Save() {
 	enc.Encode(*c)
 }
 
-// Implement OTSHandler interface
+// Implement BitcoinRPCManager interface
 func (c *Config) GetBitcoinRPC() *BTCRPCClient {
 	return c.BTCRPC
 }

@@ -1,5 +1,6 @@
 # TODO
 
+- printOTSResult should be on OTSService and the result should be a struct with fields like status etc.
 - add per stream relay pooling
 - encrypt private keys and ask for a password for `append, follow, unfollow` actions
 - potentially encrypt all the streams requiring a password for any action

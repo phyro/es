@@ -195,7 +195,7 @@ func (db *LocalDB) SaveEventStream(es *EventStream) error {
 }
 
 // Follow a stream of a pubkey - we start at the genesis event (NULL)
-func (db *LocalDB) FollowEventStream(n *Nostr, pubkey string, name string, rpcclient *BTCRPCClient) error {
+func (db *LocalDB) FollowEventStream(n *Nostr, ots Timestamper, pubkey string, name string) error {
 	if pubkey == "" {
 		return errors.New("follow pubkey is empty")
 	}
@@ -216,7 +216,7 @@ func (db *LocalDB) FollowEventStream(n *Nostr, pubkey string, name string, rpccl
 	fmt.Printf("Followed %s.\n", pubkey)
 
 	// Sync the event stream
-	err = es.Sync(n, rpcclient)
+	err = es.Sync(n, ots)
 	if err != nil {
 		return err
 	}

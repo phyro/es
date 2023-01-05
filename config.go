@@ -15,14 +15,10 @@ const CONFIG_FILE = "config.json"
 
 type Config struct {
 	DataDir string        `json:"-"`
-	Relays  []string      `json:"relays"`
 	BTCRPC  *BTCRPCClient `json:"btcrpc"`
 }
 
 func (c *Config) Init() {
-	if c.Relays == nil {
-		c.Relays = []string{}
-	}
 	if c.DataDir == "" {
 		base_dir_exp, _ := homedir.Expand(CONFIG_BASE_DIR)
 		c.DataDir = base_dir_exp
@@ -90,34 +86,4 @@ func (c *Config) ConfigureBitcoinRPC(host string, user string, password string) 
 func (c *Config) UnsetBitcoinRPC() {
 	c.BTCRPC = nil
 	c.Save()
-}
-
-// Implement Relayer interface
-func (c *Config) AddRelay(url string) {
-	c.Relays = append(c.Relays, url)
-	fmt.Printf("Added relay %s.\n", url)
-	c.Save()
-}
-
-func (c *Config) RemoveRelay(url string) {
-	result := []string{}
-	found := false
-	for _, relay_url := range c.Relays {
-		if relay_url != url {
-			result = append(result, relay_url)
-		} else {
-			found = true
-		}
-	}
-	if !found {
-		fmt.Printf("Could not find relay %s\n", url)
-	} else {
-		fmt.Printf("Removed relay %s.\n", url)
-		c.Relays = result
-		c.Save()
-	}
-}
-
-func (c *Config) ListRelays() []string {
-	return c.Relays
 }

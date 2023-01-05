@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/docopt/docopt-go"
 )
@@ -41,7 +42,8 @@ All pubkeys passed should *NOT* be bech32 encoded.
 func require_active(store StreamStore) {
 	_, err := store.GetActiveStream()
 	if err != nil {
-		log.Panic(err.Error())
+		log.Println(err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -51,7 +53,17 @@ func main() {
 
 	srv := &StreamService{}
 	srv.Load()
-	n := NewNostr(srv.config.ListRelays())
+	require_active(srv.store)
+	es_active, err := srv.store.GetActiveStream()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	n, err := NewNostr(es_active.Relays)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 
 	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
@@ -68,7 +80,7 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		world(srv, &n, all_es, verbose)
+		world(srv, n, all_es, verbose)
 
 	// Event stream auth
 	case opts["create"].(bool):
@@ -91,8 +103,6 @@ func main() {
 
 	// View
 	case opts["log"].(bool):
-		require_active(srv.store)
-		es_active, _ := srv.store.GetActiveStream()
 		pubkey := es_active.PubKey
 		if val, _ := opts["--name"]; val != nil {
 			pubkey, _ = srv.store.GetPubForName(val.(string))
@@ -106,7 +116,7 @@ func main() {
 			log.Println("provided event ID was empty")
 			return
 		}
-		ev, err := findEvent(&n, id)
+		ev, err := findEvent(n, id)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -121,14 +131,12 @@ func main() {
 
 	// Core
 	case opts["append"].(bool):
-		require_active(srv.store)
-		es_active, _ := srv.store.GetActiveStream()
 		content := opts["<content>"].(string)
 		ev, err := es_active.Create(content, srv.ots)
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		err = publishEvent(&n, ev)
+		err = publishEvent(n, ev)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -137,7 +145,7 @@ func main() {
 	case opts["follow"].(bool):
 		pubkey := opts["<pubkey>"].(string)
 		name := opts["<name>"].(string)
-		err := srv.store.FollowEventStream(&n, srv.ots, pubkey, name)
+		err := srv.store.FollowEventStream(n, srv.ots, pubkey, name)
 		if err != nil {
 			log.Panic(err.Error())
 		} else {
@@ -154,7 +162,7 @@ func main() {
 			pubkey, _ := srv.store.GetPubForName(val.(string))
 			es, _ = srv.store.GetEventStream(pubkey)
 		}
-		err := es.Sync(&n, srv.ots)
+		err := es.Sync(n, srv.ots)
 		// We save first as we might have added a few new valid events before error
 		srv.store.SaveEventStream(es)
 		if err != nil {
@@ -169,7 +177,7 @@ func main() {
 			log.Panic(err.Error())
 		}
 		fmt.Printf("Pushing stream labeled as %s\n", name)
-		err = publishStream(&n, es)
+		err = publishStream(n, es)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -227,12 +235,24 @@ func main() {
 		switch {
 		case opts["add"].(bool):
 			url := opts["<url>"].(string)
-			srv.config.AddRelay(url)
+			err := es_active.AddRelay(url)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			srv.store.SaveEventStream(es_active)
+			fmt.Println("Relay added")
 		case opts["remove"].(bool):
 			url := opts["<url>"].(string)
-			srv.config.RemoveRelay(url)
+			err := es_active.RemoveRelay(url)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			srv.store.SaveEventStream(es_active)
+			fmt.Println("Relay removed")
 		default:
-			for _, relay_url := range srv.config.ListRelays() {
+			for _, relay_url := range es_active.ListRelays() {
 				fmt.Println("Url:", relay_url)
 			}
 		}

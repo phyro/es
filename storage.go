@@ -60,7 +60,7 @@ type EventStreamer interface {
 	GetHead() string
 
 	// Relay management
-	AddRelay(string)
+	AddRelay(string) error
 	RemoveRelay(string) error
 	ListRelays() []string
 
@@ -78,12 +78,6 @@ type Timestamper interface {
 	Upgrade(*nostr.Event) (*opentimestamps.Timestamp, error)
 	Verify(*nostr.Event) (bool, *time.Time, error)
 	HasRPCConfigured() bool
-}
-
-type Relayer interface {
-	AddRelay(string)
-	RemoveRelay(string)
-	ListRelays() []string
 }
 
 type BitcoinRPCManager interface {

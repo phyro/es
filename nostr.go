@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -14,7 +13,7 @@ type Nostr struct {
 	Relays []*nostr.Relay
 }
 
-func NewNostr(relays []string) Nostr {
+func NewNostr(relays []string) (*Nostr, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -22,12 +21,12 @@ func NewNostr(relays []string) Nostr {
 	for _, relay_url := range relays {
 		r, err := nostr.RelayConnect(ctx, relay_url)
 		if err != nil {
-			log.Panic(err.Error())
+			return nil, err
 		}
 		result = append(result, r)
 	}
 
-	return Nostr{Relays: result}
+	return &Nostr{Relays: result}, nil
 }
 
 func (n *Nostr) SingleQuery(filter nostr.Filter) []nostr.Event {

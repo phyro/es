@@ -21,8 +21,8 @@ type EventStream struct {
 	Name    string        `json:"name"`
 	PrivKey string        `json:"privkey"`
 	PubKey  string        `json:"pubkey"`
-	Log     []nostr.Event `json:"log"`
 	Relays  []string      `json:"relays"`
+	Log     []nostr.Event `json:"log"`
 }
 
 func (es *EventStream) Create(content string, ots Timestamper) (*nostr.Event, error) {
@@ -139,33 +139,6 @@ func (es *EventStream) Sync(n *Nostr, ots Timestamper) error {
 	return nil
 }
 
-func (es *EventStream) Print(show_chain bool) {
-	fmt.Printf("%s (%s)\n", es.Name, es.PubKey)
-	if !show_chain {
-		return
-	}
-	indent := "\t\t\t"
-	fmt.Printf("\nEvent stream:\n")
-	fmt.Printf("----------------------------------------------------------\n")
-	fmt.Printf("%s%s", indent, GENESIS)
-	fmt.Printf("\n----------------------------------------------------------\n")
-	if es.Size() == 0 {
-		return
-	}
-
-	fmt.Printf("%s|", indent)
-	fmt.Printf("\n%sv\n", indent)
-	for idx, event := range es.Log {
-		fmt.Printf("----------------------------------------------------------\n")
-		printEvent(event, &es.Name, true)
-		fmt.Printf("\n----------------------------------------------------------\n")
-		if idx != es.Size()-1 {
-			fmt.Printf("%s|", indent)
-			fmt.Printf("\n%sv\n", indent)
-		}
-	}
-}
-
 func (es *EventStream) Size() int {
 	return len(es.Log)
 }
@@ -190,6 +163,67 @@ func (es *EventStream) GetHead() string {
 			return prev
 		} else {
 			prev = next
+		}
+	}
+}
+
+func (es *EventStream) AddRelay(url string) error {
+	for _, entry := range es.ListRelays() {
+		if url == entry {
+			return errors.New("relay was already added")
+		}
+	}
+	es.Relays = append(es.Relays, url)
+
+	return nil
+}
+
+func (es *EventStream) RemoveRelay(url string) error {
+	result := []string{}
+	found := false
+	for _, relay_url := range es.Relays {
+		if relay_url != url {
+			result = append(result, relay_url)
+		} else {
+			found = true
+		}
+	}
+	if !found {
+		return errors.New("relay url was not on the list")
+	} else {
+		es.Relays = result
+	}
+
+	return nil
+}
+
+func (es *EventStream) ListRelays() []string {
+	return es.Relays
+}
+
+func (es *EventStream) Print(show_chain bool) {
+	fmt.Printf("%s (%s)\n", es.Name, es.PubKey)
+	if !show_chain {
+		return
+	}
+	indent := "\t\t\t"
+	fmt.Printf("\nEvent stream:\n")
+	fmt.Printf("----------------------------------------------------------\n")
+	fmt.Printf("%s%s", indent, GENESIS)
+	fmt.Printf("\n----------------------------------------------------------\n")
+	if es.Size() == 0 {
+		return
+	}
+
+	fmt.Printf("%s|", indent)
+	fmt.Printf("\n%sv\n", indent)
+	for idx, event := range es.Log {
+		fmt.Printf("----------------------------------------------------------\n")
+		printEvent(event, &es.Name, true)
+		fmt.Printf("\n----------------------------------------------------------\n")
+		if idx != es.Size()-1 {
+			fmt.Printf("%s|", indent)
+			fmt.Printf("\n%sv\n", indent)
 		}
 	}
 }

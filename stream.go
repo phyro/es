@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
+	"golang.org/x/exp/slices"
 )
 
 const GENESIS = "NULL"
@@ -135,6 +136,32 @@ func (es *EventStream) Sync(n *Nostr, ots Timestamper) error {
 		}
 	}
 	fmt.Printf("Done\nNumber of new events: %d\nHEAD (%s) at: %s", num_new, es.Name, es.GetHead())
+
+	return nil
+}
+
+// Publishes the whole event stream to the given relay
+func (es *EventStream) Mirror(n *Nostr, relayUrl string) error {
+	// Ensure the relayUrl is on the pool of relays
+	last_published_id := "/"
+	for _, ev := range es.Log {
+		// TODO: make this more robust i.e. retry mechanism or smth
+		// Broadcast event to the relays
+		status, err := n.SendEvent(relayUrl, ev)
+		if err != nil {
+			return fmt.Errorf("didn't manage to mirror event stream. Last published event ID: %s. Err: %w", last_published_id, err)
+		}
+		if status != 1 {
+			return fmt.Errorf("didn't manage to mirror event stream. Last published event ID: %s. Status: %s, Err: %w", last_published_id, status, err)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Now that we have the event stream available on the relay, add relay to the relay list
+	if !slices.Contains(es.Relays, relayUrl) {
+		es.Relays = append(es.Relays, relayUrl)
+	}
 
 	return nil
 }

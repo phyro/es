@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/nbd-wtf/go-nostr"
@@ -22,7 +21,11 @@ var kindNames = map[int]string{
 
 func findEvent(n *Nostr, id string) (*nostr.Event, error) {
 	fmt.Printf("\nSearching event id: %s", id)
-	for _, event := range n.SingleQuery(nostr.Filter{IDs: []string{id}}) {
+	evs, err := n.SingleQueryPool(nostr.Filter{IDs: []string{id}})
+	if err != nil {
+		return nil, err
+	}
+	for _, event := range evs {
 		if event.ID != id {
 			log.Printf("got unexpected event %s.\n", event.ID)
 			continue
@@ -34,43 +37,56 @@ func findEvent(n *Nostr, id string) (*nostr.Event, error) {
 }
 
 // Add event to my stream. In case there were no previous events on the Stream, make a genesis event.
-func publishEvent(n *Nostr, ev *nostr.Event) error {
-	status := n.PublishEvent(*ev)
-	if status != 1 {
-		return fmt.Errorf("error publishing event. Status: %s", status)
-	}
+// func publishEvent(n *Nostr, ev *nostr.Event) error {
+// 	status, err := n.PublishEvent(*ev)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if status != 1 {
+// 		return fmt.Errorf("error publishing event. Status: %s", status)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func publishStream(n *Nostr, es *EventStream) error {
-	last_published_id := "/"
-	for _, ev := range es.Log {
-		err := publishEvent(n, &ev)
-		if err != nil {
-			return fmt.Errorf("didn't manage to publish the event stream. Last published event ID: %s", last_published_id)
-		}
-		last_published_id = ev.ID
-		// Don't spam
-		time.Sleep(100 * time.Millisecond)
-	}
+// func publishStream(n *Nostr, es *EventStream) error {
+// 	last_published_id := "/"
+// 	for _, ev := range es.Log {
+// 		err := publishEvent(n, &ev)
+// 		if err != nil {
+// 			return fmt.Errorf("didn't manage to publish the event stream. Last published event ID: %s", last_published_id)
+// 		}
+// 		last_published_id = ev.ID
+// 		// Don't spam
+// 		time.Sleep(100 * time.Millisecond)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // Find the next events in the hashchain
 func findNextEvents(n *Nostr, pubkey string, prev string) ([]*nostr.Event, error) {
 	result := []*nostr.Event{}
 	// Mapping from prev value to event struct. Used to construct the sequence that we return
 	prev_to_event := map[string]nostr.Event{}
-	for _, event := range n.SingleQuery(nostr.Filter{Authors: []string{pubkey}}) {
-		for _, tag := range event.Tags {
-			val, exists := prev_to_event[tag.Value()]
-			if exists {
-				fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", val.ID, event.ID)
-				return nil, errors.New("Conflict")
+	evs, err := n.SingleQueryPool(nostr.Filter{Authors: []string{pubkey}})
+	if err != nil {
+		return nil, err
+	}
+	// TODO: make the evs slice unique
+	for _, ev := range evs {
+		for _, tag := range ev.Tags {
+			if tag.Key() != "prev" {
+				continue
 			}
-			prev_to_event[tag.Value()] = event
+			entry, exists := prev_to_event[tag.Value()]
+			// if the entry exists, make sure the entry has the same id as event id
+			if exists && ev.ID != entry.ID {
+				fmt.Printf("\nConflict detected. Two events with the same prev. Ids: %s, %s", entry.ID, ev.ID)
+				return nil, errors.New("Conflict")
+			} else {
+				prev_to_event[tag.Value()] = ev
+			}
 		}
 	}
 

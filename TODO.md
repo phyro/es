@@ -1,7 +1,6 @@
 # TODO
 
 - fix `world` function - n *Nostr is tied to the active account and their relays. We have to create new for every event stream we sync and listen
-- add some default relays?
 - printOTSResult should be on OTSService and the result should be a struct with fields like status etc.
 - add per stream relay pooling
 - encrypt private keys and ask for a password for `append, follow, unfollow` actions
@@ -14,6 +13,7 @@
     - es-lib
     - es-cli
     - es-tui
+- smarter relay pooling
 
 ### OTS
 

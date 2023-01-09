@@ -33,23 +33,28 @@ type StreamStoreWriter interface {
 
 // EventStreamer provides an interface for managing event streams
 type EventStreamer interface {
-	// Core event stream behaviour
-	Create(string, Timestamper) (*nostr.Event, error)
-	Append(nostr.Event, Timestamper) error
-	Sync(*Nostr, Timestamper) error
-	Size() int
-	GetHead() string
-
-	// Relay management
-	AddRelay(string) error
-	RemoveRelay(string) error
-	ListRelays() []string
-	HasRelays() bool
-
+	EventStreamReader
+	EventStreamWriter
 	Print(bool)
 	// TODO: We can make a correct by construction design by appending only
 	// valid events that follow the rules. What happens if the calendar doesn't
 	// attest to our event though? We may need a "Verify" on EventStreamer
+}
+
+type EventStreamReader interface {
+	Size() int
+	GetHead() string
+	ListRelays() []string
+	HasRelays() bool
+}
+
+type EventStreamWriter interface {
+	Create(string, Timestamper) (*nostr.Event, error)
+	Append(nostr.Event, Timestamper) error
+	Sync(*Nostr, Timestamper) error
+	Mirror(*Nostr, string) error
+	AddRelay(string) error
+	RemoveRelay(string) error
 }
 
 // Timestamper provides an interface for timestamping nostr events

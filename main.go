@@ -23,7 +23,7 @@ Usage:
   es unfollow <name>
   es sync <name>
   es sync
-  es push <name>
+  es push <name> <url>
   es push
   es log [--name=<name>]
   es show <id> [--verbose]
@@ -60,6 +60,8 @@ func main() {
 
 	srv := &StreamService{}
 	srv.Load()
+	// Add a single default relay so the pool isn't empty
+	n := NewNostr([]string{"wss://nostr-relay.digitalmob.ro"})
 
 	// Parse args
 	opts, err := docopt.ParseArgs(USAGE, flag.Args(), "")
@@ -76,7 +78,8 @@ func main() {
 		priv_key, _ := opts.String("<privkey>")
 		generate, _ := opts.Bool("--gen")
 		srv.store.CreateEventStream(name, priv_key, generate)
-	case opts["remove"].(bool):
+	// We have to check that the "remove" option is not called with "es relay remove"
+	case opts["remove"].(bool) && !opts["relay"].(bool):
 		name := opts["<name>"].(string)
 		srv.store.RemoveEventStream(name)
 		fmt.Printf("Removed %s stream.", name)
@@ -94,11 +97,7 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	n, err := NewNostr(es_active.Relays)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
+	n.AddRelays(es_active.Relays)
 
 	switch {
 	// View the event stream world
@@ -149,9 +148,10 @@ func main() {
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		err = publishEvent(n, ev)
+		err = n.BroadcastEvent(es_active.Relays, *ev)
 		if err != nil {
-			log.Panic(err.Error())
+			log.Println(err.Error())
+			// Even if we failed to broadcast, we still save the event
 		}
 		srv.store.SaveEventStream(es_active)
 		fmt.Println("Added event:", ev.ID)
@@ -188,16 +188,22 @@ func main() {
 	case opts["push"].(bool):
 		require_active(srv.store)
 		name := opts["<name>"].(string)
+		relayUrl := opts["<url>"].(string)
 		pubkey, _ := srv.store.GetPubForName(name)
 		es, err := srv.store.GetEventStream(pubkey)
 		if err != nil {
 			log.Panic(err.Error())
 		}
-		fmt.Printf("Pushing stream labeled as %s\n", name)
-		err = publishStream(n, es)
+		fmt.Printf("Pushing stream labeled as %s to relay %s\n", name, relayUrl)
+		// Create a new nostr relay pool with just this relay
+		nPush := NewNostr([]string{relayUrl})
+		err = es.Mirror(nPush, relayUrl)
 		if err != nil {
-			log.Panic(err.Error())
+			log.Println(err.Error())
+			return
 		}
+		// We save because we added the relay to the list of relays of this stream
+		srv.store.SaveEventStream(es)
 		fmt.Println("Stream succesfully pushed.")
 
 	// OpenTimestamps
